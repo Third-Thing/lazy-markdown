@@ -8,7 +8,7 @@ The split keeps reusable command descriptions in `core` while the app owns edito
 
 The app is the host. It owns the window, the editor, the current file path, the unsaved-change state, file dialogs, saves, and status messages.
 
-The core crate is the shared rulebook for commands. It defines command IDs, command titles, default shortcuts, and placement hints for UI surfaces such as a toolbar or command palette.
+The core crate is the shared rulebook for commands. It defines command IDs, command titles, default shortcuts, and placement hints for UI surfaces such as a menu or command palette.
 
 At startup, the host builds its command list:
 
@@ -16,7 +16,7 @@ At startup, the host builds its command list:
 2. It adds the built-in file commands.
 3. It starts the editor window with the command registry.
 
-After startup, user actions go through commands. A toolbar click and a keyboard shortcut both ask the host to run the same command ID. For example, clicking Save and pressing the Save shortcut both run `file.save`.
+After startup, user actions go through commands. A menu item and a keyboard shortcut both ask the host to run the same command ID. For example, choosing Save and pressing the Save shortcut both run `file.save`.
 
 When `file.save` runs, the host checks whether the current document already has a file path. If it does, the host writes the current text to that path. If it does not, the host opens a Save As dialog first, then writes to the selected path.
 
@@ -41,7 +41,7 @@ The built-in file commands currently live in `core`:
 - `file.save`
 - `file.save_as`
 
-Each command has a stable ID, title, optional default shortcut, and placement hints for UI surfaces such as toolbar and palette.
+Each command has a stable ID, title, optional default shortcut, and placement hints for UI surfaces such as menu and palette.
 
 ## App Host
 
@@ -57,7 +57,7 @@ Each command has a stable ID, title, optional default shortcut, and placement hi
 - Command dispatch.
 - Atomic saving.
 
-Commands are the shared entry point for UI actions. The toolbar and keyboard handler both call `invoke_command` with a command ID, so `file.save` and `file.save_as` are not separate UI-only code paths.
+Commands are the shared entry point for UI actions. The menu and keyboard handler both call `invoke_command` with a command ID, so `file.save` and `file.save_as` are not separate UI-only code paths.
 
 This keeps later UI surfaces, such as context menus or a command palette, able to use the same command IDs and metadata.
 
@@ -80,8 +80,8 @@ The app keeps ownership of all user-facing save behavior. That includes Save As 
 
 ## Current Limits
 
-Toolbar command order is still host-owned through a fixed list of command IDs. The registry can filter by placement, but the command metadata does not yet include ordering or grouping.
+Menu command order is still host-owned through fixed command IDs. The registry can filter by placement, but the command metadata does not yet include ordering or grouping.
 
-Before fully generating the toolbar from the registry, add explicit metadata for order and groups so the UI is stable and intentional.
+Before fully generating the menu from the registry, add explicit metadata for order and groups so the UI is stable and intentional.
 
 The future service boundary for out-of-process tools should be added after the native command model settles. Good candidates are linting, project search, and document analysis. Save and deep editor behavior should remain native host code unless there is a clear reason to move them elsewhere.

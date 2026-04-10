@@ -14,5 +14,5 @@ repository = "https://github.com/Third-Thing/lazy-markdown"
 
 [workspace.dependencies]
 lazy-markdown-core = { path = "crates/core" }
-floem = { git = "https://github.com/Third-Thing/floem.git", rev = "16ff6bea81b77ac3b09ee02e45ab1857f0f9e731" }
+floem = { git = "https://github.com/Third-Thing/floem.git", branch = "dirty-tracking-and-stale-cursor-crash-fix" }
 atomic-write-file = { version = "0.3.0", features = ["unnamed-tmpfile"] }

@@ -22,7 +22,7 @@ pub struct Shortcut {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CommandPlacement {
-    Toolbar,
+    Menu,
     ContextMenu,
     Palette,
 }
@@ -81,7 +81,7 @@ pub mod ids {
 const PRIMARY: &[ShortcutModifier] = &[ShortcutModifier::Control];
 const PRIMARY_SHIFT: &[ShortcutModifier] = &[ShortcutModifier::Control, ShortcutModifier::Shift];
 const FILE_COMMAND_PLACEMENTS: &[CommandPlacement] =
-    &[CommandPlacement::Toolbar, CommandPlacement::Palette];
+    &[CommandPlacement::Menu, CommandPlacement::Palette];
 
 const FILE_NEW_COMMAND: CommandMetadata = CommandMetadata {
     id: ids::FILE_NEW,

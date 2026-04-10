@@ -6,7 +6,9 @@ use std::{
 
 use atomic_write_file::AtomicWriteFile;
 use floem::{
-    Application, FileDialogOptions, close_window, open_file,
+    Application, FileDialogOptions, close_window,
+    menu::Menu,
+    open_file,
     peniko::{Color, color::palette},
     prelude::*,
     save_as,
@@ -27,13 +29,6 @@ use lazy_markdown_core::{
     CommandRegistry, ModuleRegistry, Shortcut, ShortcutKey, ShortcutModifier, command_ids,
     register_builtin_commands,
 };
-
-const TOOLBAR_COMMAND_IDS: [&str; 4] = [
-    command_ids::FILE_NEW,
-    command_ids::FILE_OPEN,
-    command_ids::FILE_SAVE,
-    command_ids::FILE_SAVE_AS,
-];
 
 #[derive(Clone)]
 enum PendingAction {
@@ -243,18 +238,64 @@ fn invoke_command(command_id: &str, state: &AppState, editor: &Editor) {
     }
 }
 
-fn command_button(
-    command_registry: &CommandRegistry,
-    command_id: &'static str,
-    state: AppState,
-    editor: Editor,
-) -> Button {
-    let title = command_registry
+fn command_title(command_registry: &CommandRegistry, command_id: &'static str) -> &'static str {
+    command_registry
         .get(command_id)
         .map(|command| command.title)
-        .unwrap_or(command_id);
+        .unwrap_or(command_id)
+}
 
-    Button::new(title).action(move || invoke_command(command_id, &state, &editor))
+fn command_menu(command_registry: &CommandRegistry, state: AppState, editor: Editor) -> Menu {
+    let new_title = command_title(command_registry, command_ids::FILE_NEW);
+    let open_title = command_title(command_registry, command_ids::FILE_OPEN);
+    let save_title = command_title(command_registry, command_ids::FILE_SAVE);
+    let save_as_title = command_title(command_registry, command_ids::FILE_SAVE_AS);
+
+    let new_state = state.clone();
+    let new_editor = editor.clone();
+    let open_state = state.clone();
+    let open_editor = editor.clone();
+    let save_state = state.clone();
+    let save_editor = editor.clone();
+    let save_as_state = state;
+    let save_as_editor = editor;
+
+    Menu::new()
+        .item(new_title, move |item| {
+            item.action(move || invoke_command(command_ids::FILE_NEW, &new_state, &new_editor))
+        })
+        .item(open_title, move |item| {
+            item.action(move || invoke_command(command_ids::FILE_OPEN, &open_state, &open_editor))
+        })
+        .separator()
+        .item(save_title, move |item| {
+            item.action(move || invoke_command(command_ids::FILE_SAVE, &save_state, &save_editor))
+        })
+        .item(save_as_title, move |item| {
+            item.action(move || {
+                invoke_command(command_ids::FILE_SAVE_AS, &save_as_state, &save_as_editor)
+            })
+        })
+}
+
+fn menu_button(
+    command_registry: CommandRegistry,
+    state: AppState,
+    editor: Editor,
+) -> impl IntoView {
+    Label::new("File")
+        .style(|s| {
+            s.selectable(false)
+                .padding_horiz(10.0)
+                .padding_vert(6.0)
+                .border(1.0)
+                .border_color(Color::from_rgb8(196, 199, 204))
+                .border_radius(6.0)
+                .background(Color::from_rgb8(248, 249, 250))
+                .hover(|s| s.background(Color::from_rgb8(232, 236, 240)))
+                .active(|s| s.background(Color::from_rgb8(218, 224, 230)))
+        })
+        .popout_menu(move || command_menu(&command_registry, state.clone(), editor.clone()))
 }
 
 fn supported_modifiers(modifiers: Modifiers) -> Modifiers {
@@ -480,39 +521,17 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
 
     let editor_state = editor.editor().clone();
 
-    let command_bar = Stack::horizontal((
-        command_button(
-            &bootstrap.command_registry,
-            TOOLBAR_COMMAND_IDS[0],
-            state.clone(),
-            editor_state.clone(),
-        ),
-        command_button(
-            &bootstrap.command_registry,
-            TOOLBAR_COMMAND_IDS[1],
-            state.clone(),
-            editor_state.clone(),
-        ),
-        command_button(
-            &bootstrap.command_registry,
-            TOOLBAR_COMMAND_IDS[2],
-            state.clone(),
-            editor_state.clone(),
-        ),
-        command_button(
-            &bootstrap.command_registry,
-            TOOLBAR_COMMAND_IDS[3],
-            state.clone(),
-            editor_state.clone(),
-        ),
-    ))
-    .style(|s| s.col_gap(8.0));
+    let main_menu = menu_button(
+        bootstrap.command_registry.clone(),
+        state.clone(),
+        editor_state.clone(),
+    );
 
     let top_bar_editor = editor_state.clone();
     let top_bar = {
         let state = state.clone();
         Stack::horizontal((
-            command_bar,
+            main_menu,
             Label::derived(move || {
                 let path = state.file_path.get();
                 let doc = top_bar_editor.doc_track();

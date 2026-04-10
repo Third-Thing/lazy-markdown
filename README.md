@@ -2,7 +2,22 @@
 
 Goal: An efficient, safe, modular markdown editor with all dependencies written in Rust.
 
-## Primary planned features (or bundled plugins)
+## Status
+
+This is currently a plain text notepad, with no markdown functionality (peak laziness).
+
+It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tree/dirty-tracking-and-stale-cursor-crash-fix) for proper dirty state tracking and a few crash fixes, while waiting for the [PRs](https://github.com/lapce/floem/pulls) to get merged.
+
+### Current Features
+
+- floem's built-in undo/redo
+- floem's built-in save/open dialogs
+- floem's built-in gutter (line numbers)
+- menu actions and hotkeys for new/save/save-as/open
+- custom save or discard on close overlay
+- atomic writing
+
+## Primary planned features
 
 ### v0.3.0
 
@@ -20,24 +35,6 @@ Goal: An efficient, safe, modular markdown editor with all dependencies written 
 - search / replace
 - spell check
 - configuration file for style and hotkeys
-
-## Status
-
-This is currently a plain text notepad, with no markdown functionality (peak laziness).
-
-It currently relies on a commit that's [waiting to be merged into floem](https://github.com/lapce/floem/pull/1060) for proper dirty state tracking.
-
-### Current Features
-
-- floem's built-in undo/redo
-- floem's built-in save/open dialogs
-- floem's built-in gutter (line numbers)
-- buttons for new/save/save-as/open
-- custom Ctrl+S hotkey
-- custom save or discard on close overlay
-- atomic writing
-
-Buttons are used instead of a menu because floem doesn't provide a menu for linux yet.
 
 ## License
 
