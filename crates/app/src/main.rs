@@ -64,6 +64,7 @@ struct AppState {
     status_message: RwSignal<Option<String>>,
     pending_action: RwSignal<Option<PendingAction>>,
     show_confirm: RwSignal<bool>,
+    save_as_dialog_open: RwSignal<bool>,
 }
 
 fn current_name(path: Option<&Path>) -> String {
@@ -158,6 +159,12 @@ fn finish_pending_action(action: PendingAction, state: &AppState, editor: &Edito
 }
 
 fn request_save_as(state: AppState, editor: Editor) {
+    if state.save_as_dialog_open.get_untracked() {
+        return;
+    }
+
+    state.save_as_dialog_open.set(true);
+
     let mut options = FileDialogOptions::new()
         .title("Save file")
         .default_name(current_name(state.file_path.get_untracked().as_deref()));
@@ -173,10 +180,12 @@ fn request_save_as(state: AppState, editor: Editor) {
 
     save_as(options, move |file_info| {
         let Some(path) = file_info.and_then(|info| info.path.into_iter().next()) else {
+            state.save_as_dialog_open.set(false);
             return;
         };
 
         save_editor_to_path(&state, &editor, &path);
+        state.save_as_dialog_open.set(false);
     });
 }
 
@@ -427,11 +436,13 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     let status_message = RwSignal::new(None::<String>);
     let pending_action = RwSignal::new(None::<PendingAction>);
     let show_confirm = RwSignal::new(false);
+    let save_as_dialog_open = RwSignal::new(false);
     let state = AppState {
         file_path,
         status_message,
         pending_action,
         show_confirm,
+        save_as_dialog_open,
     };
 
     let initial_text = match file_path.get_untracked() {
