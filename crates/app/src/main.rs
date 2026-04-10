@@ -89,8 +89,41 @@ impl DocumentId {
 }
 
 #[derive(Clone)]
+struct DocumentSet {
+    documents: Vec<DocumentState>,
+    active_id: Option<DocumentId>,
+}
+
+impl DocumentSet {
+    fn empty() -> Self {
+        Self {
+            documents: Vec::new(),
+            active_id: None,
+        }
+    }
+
+    fn new(active_document: DocumentState) -> Self {
+        Self {
+            active_id: Some(active_document.id()),
+            documents: vec![active_document],
+        }
+    }
+
+    fn active_document(&self) -> Option<DocumentState> {
+        self.active_id.and_then(|id| self.document_by_id(id))
+    }
+
+    fn document_by_id(&self, id: DocumentId) -> Option<DocumentState> {
+        self.documents
+            .iter()
+            .find(|document| document.id() == id)
+            .cloned()
+    }
+}
+
+#[derive(Clone)]
 struct AppState {
-    active_document: RwSignal<Option<DocumentState>>,
+    documents: RwSignal<DocumentSet>,
     status_message: RwSignal<Option<String>>,
     pending_action: RwSignal<Option<PendingAction>>,
     show_confirm: RwSignal<bool>,
@@ -99,7 +132,15 @@ struct AppState {
 
 impl AppState {
     fn active_document(&self) -> Option<DocumentState> {
-        self.active_document.get_untracked()
+        self.documents.get().active_document()
+    }
+
+    fn active_document_untracked(&self) -> Option<DocumentState> {
+        self.documents.get_untracked().active_document()
+    }
+
+    fn document_by_id_untracked(&self, id: DocumentId) -> Option<DocumentState> {
+        self.documents.get_untracked().document_by_id(id)
     }
 }
 
@@ -190,16 +231,12 @@ fn finish_pending_action(action: PendingAction, state: &AppState) {
     match action {
         PendingAction::CloseWindow(window_id) => close_window(window_id),
         PendingAction::NewDocument { document_id } => {
-            if let Some(document) = state.active_document()
-                && document.id() == document_id
-            {
+            if let Some(document) = state.document_by_id_untracked(document_id) {
                 replace_with_new_document(state, &document);
             }
         }
         PendingAction::OpenFile { document_id, path } => {
-            if let Some(document) = state.active_document()
-                && document.id() == document_id
-            {
+            if let Some(document) = state.document_by_id_untracked(document_id) {
                 replace_with_file(state, &document, path);
             }
         }
@@ -274,7 +311,7 @@ fn request_open(state: AppState, document: DocumentState) {
 }
 
 fn invoke_command(command_id: &str, state: &AppState) {
-    let Some(document) = state.active_document() else {
+    let Some(document) = state.active_document_untracked() else {
         state
             .status_message
             .set(Some("No active document".to_string()));
@@ -528,13 +565,13 @@ fn confirm_overlay(state: AppState) -> Overlay {
 
 fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     let file_path = RwSignal::new(std::env::args().nth(1).map(PathBuf::from));
-    let active_document = RwSignal::new(None::<DocumentState>);
+    let documents = RwSignal::new(DocumentSet::empty());
     let status_message = RwSignal::new(None::<String>);
     let pending_action = RwSignal::new(None::<PendingAction>);
     let show_confirm = RwSignal::new(false);
     let save_as_dialog_open = RwSignal::new(false);
     let state = AppState {
-        active_document,
+        documents,
         status_message,
         pending_action,
         show_confirm,
@@ -573,7 +610,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     );
 
     let editor_state = editor.editor().clone();
-    state.active_document.set(Some(DocumentState::new(
+    state.documents.set(DocumentSet::new(DocumentState::new(
         DocumentId::initial(),
         file_path,
         editor_state.clone(),
@@ -586,7 +623,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
         Stack::horizontal((
             main_menu,
             Label::derived(move || {
-                let Some(document) = state.active_document.get() else {
+                let Some(document) = state.active_document() else {
                     return current_name(None);
                 };
                 let path = document.file_path.get();
@@ -651,7 +688,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     .window_title({
         let state = state.clone();
         move || {
-            let Some(document) = state.active_document.get() else {
+            let Some(document) = state.active_document() else {
                 return current_name(None);
             };
             let path = document.file_path.get();
@@ -663,7 +700,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     .on_event_cont(listener::WindowCloseRequested, {
         let state = state.clone();
         move |cx, _| {
-            let Some(document) = state.active_document() else {
+            let Some(document) = state.active_document_untracked() else {
                 return;
             };
             if document.editor.doc().is_dirty() {

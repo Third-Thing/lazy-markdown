@@ -78,7 +78,7 @@ The save path is:
 
 The app keeps ownership of all user-facing save behavior. That includes Save As dialogs, pending close/open flow, dirty/pristine updates, and status messages.
 
-Document-owned state is separate from app/window state. `DocumentState` currently stores the active document's file path and editor, while `AppState` stores window-level status, pending actions, confirmation overlay state, and dialog flags. This keeps the single-document app behavior intact while preparing the host to manage multiple documents as tabs.
+Document-owned state is separate from app/window state. `DocumentState` stores a document ID, file path, and editor. `DocumentSet` stores the documents and active document ID. `AppState` stores the document set plus window-level status, pending actions, confirmation overlay state, and dialog flags. This keeps the single-document app behavior intact while preparing the host to manage multiple documents as tabs.
 
 ## Current Limits
 
