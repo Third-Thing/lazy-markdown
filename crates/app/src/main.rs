@@ -33,8 +33,13 @@ use lazy_markdown_core::{
 #[derive(Clone)]
 enum PendingAction {
     CloseWindow(WindowId),
-    NewDocument,
-    OpenFile(PathBuf),
+    NewDocument {
+        document_id: DocumentId,
+    },
+    OpenFile {
+        document_id: DocumentId,
+        path: PathBuf,
+    },
 }
 
 #[derive(Clone)]
@@ -54,12 +59,48 @@ impl AppBootstrap {
 }
 
 #[derive(Clone)]
-struct AppState {
+struct DocumentState {
+    id: DocumentId,
     file_path: RwSignal<Option<PathBuf>>,
+    editor: Editor,
+}
+
+impl DocumentState {
+    fn new(id: DocumentId, file_path: RwSignal<Option<PathBuf>>, editor: Editor) -> Self {
+        Self {
+            id,
+            file_path,
+            editor,
+        }
+    }
+
+    fn id(&self) -> DocumentId {
+        self.id
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct DocumentId(u64);
+
+impl DocumentId {
+    fn initial() -> Self {
+        Self(1)
+    }
+}
+
+#[derive(Clone)]
+struct AppState {
+    active_document: RwSignal<Option<DocumentState>>,
     status_message: RwSignal<Option<String>>,
     pending_action: RwSignal<Option<PendingAction>>,
     show_confirm: RwSignal<bool>,
     save_as_dialog_open: RwSignal<bool>,
+}
+
+impl AppState {
+    fn active_document(&self) -> Option<DocumentState> {
+        self.active_document.get_untracked()
+    }
 }
 
 fn current_name(path: Option<&Path>) -> String {
@@ -99,28 +140,28 @@ fn write_editor_text(editor: &Editor, path: &Path) -> Result<(), String> {
         .map_err(|err| format!("Failed to save {}: {err}", path.display()))
 }
 
-fn save_editor_to_path(state: &AppState, editor: &Editor, path: &Path) {
-    match write_editor_text(editor, path) {
+fn save_document_to_path(state: &AppState, document: &DocumentState, path: &Path) {
+    match write_editor_text(&document.editor, path) {
         Ok(()) => {
-            editor.doc().mark_pristine();
-            state.file_path.set(Some(path.to_path_buf()));
+            document.editor.doc().mark_pristine();
+            document.file_path.set(Some(path.to_path_buf()));
             state
                 .status_message
                 .set(Some(format!("Saved {}", path.display())));
             if let Some(action) = state.pending_action.get_untracked() {
-                finish_pending_action(action, state, editor);
+                finish_pending_action(action, state);
             }
         }
         Err(err) => state.status_message.set(Some(err)),
     }
 }
 
-fn replace_with_file(state: &AppState, editor: &Editor, path: PathBuf) {
+fn replace_with_file(state: &AppState, document: &DocumentState, path: PathBuf) {
     match std::fs::read_to_string(&path) {
         Ok(text) => {
-            let doc: Rc<dyn Document> = Rc::new(TextDocument::new(editor.cx.get(), text));
-            editor.update_doc(doc, None);
-            state.file_path.set(Some(path.clone()));
+            let doc: Rc<dyn Document> = Rc::new(TextDocument::new(document.editor.cx.get(), text));
+            document.editor.update_doc(doc, None);
+            document.file_path.set(Some(path.clone()));
             state
                 .status_message
                 .set(Some(format!("Opened {}", path.display())));
@@ -133,27 +174,39 @@ fn replace_with_file(state: &AppState, editor: &Editor, path: PathBuf) {
     }
 }
 
-fn replace_with_new_document(state: &AppState, editor: &Editor) {
-    let doc: Rc<dyn Document> = Rc::new(TextDocument::new(editor.cx.get(), String::new()));
-    editor.update_doc(doc, None);
-    state.file_path.set(None);
+fn replace_with_new_document(state: &AppState, document: &DocumentState) {
+    let doc: Rc<dyn Document> = Rc::new(TextDocument::new(document.editor.cx.get(), String::new()));
+    document.editor.update_doc(doc, None);
+    document.file_path.set(None);
     state
         .status_message
         .set(Some("Started a new document".to_string()));
 }
 
-fn finish_pending_action(action: PendingAction, state: &AppState, editor: &Editor) {
+fn finish_pending_action(action: PendingAction, state: &AppState) {
     state.pending_action.set(None);
     state.show_confirm.set(false);
 
     match action {
         PendingAction::CloseWindow(window_id) => close_window(window_id),
-        PendingAction::NewDocument => replace_with_new_document(state, editor),
-        PendingAction::OpenFile(path) => replace_with_file(state, editor, path),
+        PendingAction::NewDocument { document_id } => {
+            if let Some(document) = state.active_document()
+                && document.id() == document_id
+            {
+                replace_with_new_document(state, &document);
+            }
+        }
+        PendingAction::OpenFile { document_id, path } => {
+            if let Some(document) = state.active_document()
+                && document.id() == document_id
+            {
+                replace_with_file(state, &document, path);
+            }
+        }
     }
 }
 
-fn request_save_as(state: AppState, editor: Editor) {
+fn request_save_as(state: AppState, document: DocumentState) {
     if state.save_as_dialog_open.get_untracked() {
         return;
     }
@@ -162,13 +215,13 @@ fn request_save_as(state: AppState, editor: Editor) {
 
     let mut options = FileDialogOptions::new()
         .title("Save file")
-        .default_name(current_name(state.file_path.get_untracked().as_deref()));
+        .default_name(current_name(document.file_path.get_untracked().as_deref()));
 
-    if let Some(path) = state
+    if let Some(path) = document
         .file_path
         .get_untracked()
         .as_ref()
-        .and_then(|path| path.parent())
+        .and_then(|path| path.parent().map(Path::to_path_buf))
     {
         options = options.force_starting_directory(path);
     }
@@ -179,26 +232,26 @@ fn request_save_as(state: AppState, editor: Editor) {
             return;
         };
 
-        save_editor_to_path(&state, &editor, &path);
+        save_document_to_path(&state, &document, &path);
         state.save_as_dialog_open.set(false);
     });
 }
 
-fn request_save(state: &AppState, editor: &Editor) {
-    if let Some(path) = state.file_path.get_untracked() {
-        save_editor_to_path(state, editor, &path);
+fn request_save(state: &AppState, document: &DocumentState) {
+    if let Some(path) = document.file_path.get_untracked() {
+        save_document_to_path(state, document, &path);
     } else {
-        request_save_as(state.clone(), editor.clone());
+        request_save_as(state.clone(), document.clone());
     }
 }
 
-fn request_open(state: AppState, editor: Editor) {
+fn request_open(state: AppState, document: DocumentState) {
     let mut options = FileDialogOptions::new().title("Open file");
-    if let Some(path) = state
+    if let Some(path) = document
         .file_path
         .get_untracked()
         .as_ref()
-        .and_then(|path| path.parent())
+        .and_then(|path| path.parent().map(Path::to_path_buf))
     {
         options = options.force_starting_directory(path);
     }
@@ -208,30 +261,40 @@ fn request_open(state: AppState, editor: Editor) {
             return;
         };
 
-        if editor.doc().is_dirty() {
-            state
-                .pending_action
-                .set(Some(PendingAction::OpenFile(path)));
+        if document.editor.doc().is_dirty() {
+            state.pending_action.set(Some(PendingAction::OpenFile {
+                document_id: document.id(),
+                path,
+            }));
             state.show_confirm.set(true);
         } else {
-            replace_with_file(&state, &editor, path);
+            replace_with_file(&state, &document, path);
         }
     });
 }
 
-fn invoke_command(command_id: &str, state: &AppState, editor: &Editor) {
+fn invoke_command(command_id: &str, state: &AppState) {
+    let Some(document) = state.active_document() else {
+        state
+            .status_message
+            .set(Some("No active document".to_string()));
+        return;
+    };
+
     match command_id {
         command_ids::FILE_NEW => {
-            if editor.doc().is_dirty() {
-                state.pending_action.set(Some(PendingAction::NewDocument));
+            if document.editor.doc().is_dirty() {
+                state.pending_action.set(Some(PendingAction::NewDocument {
+                    document_id: document.id(),
+                }));
                 state.show_confirm.set(true);
             } else {
-                replace_with_new_document(state, editor);
+                replace_with_new_document(state, &document);
             }
         }
-        command_ids::FILE_OPEN => request_open(state.clone(), editor.clone()),
-        command_ids::FILE_SAVE => request_save(state, editor),
-        command_ids::FILE_SAVE_AS => request_save_as(state.clone(), editor.clone()),
+        command_ids::FILE_OPEN => request_open(state.clone(), document),
+        command_ids::FILE_SAVE => request_save(state, &document),
+        command_ids::FILE_SAVE_AS => request_save_as(state.clone(), document),
         _ => state
             .status_message
             .set(Some(format!("Unknown command `{command_id}`"))),
@@ -245,44 +308,34 @@ fn command_title(command_registry: &CommandRegistry, command_id: &'static str) -
         .unwrap_or(command_id)
 }
 
-fn command_menu(command_registry: &CommandRegistry, state: AppState, editor: Editor) -> Menu {
+fn command_menu(command_registry: &CommandRegistry, state: AppState) -> Menu {
     let new_title = command_title(command_registry, command_ids::FILE_NEW);
     let open_title = command_title(command_registry, command_ids::FILE_OPEN);
     let save_title = command_title(command_registry, command_ids::FILE_SAVE);
     let save_as_title = command_title(command_registry, command_ids::FILE_SAVE_AS);
 
     let new_state = state.clone();
-    let new_editor = editor.clone();
     let open_state = state.clone();
-    let open_editor = editor.clone();
     let save_state = state.clone();
-    let save_editor = editor.clone();
     let save_as_state = state;
-    let save_as_editor = editor;
 
     Menu::new()
         .item(new_title, move |item| {
-            item.action(move || invoke_command(command_ids::FILE_NEW, &new_state, &new_editor))
+            item.action(move || invoke_command(command_ids::FILE_NEW, &new_state))
         })
         .item(open_title, move |item| {
-            item.action(move || invoke_command(command_ids::FILE_OPEN, &open_state, &open_editor))
+            item.action(move || invoke_command(command_ids::FILE_OPEN, &open_state))
         })
         .separator()
         .item(save_title, move |item| {
-            item.action(move || invoke_command(command_ids::FILE_SAVE, &save_state, &save_editor))
+            item.action(move || invoke_command(command_ids::FILE_SAVE, &save_state))
         })
         .item(save_as_title, move |item| {
-            item.action(move || {
-                invoke_command(command_ids::FILE_SAVE_AS, &save_as_state, &save_as_editor)
-            })
+            item.action(move || invoke_command(command_ids::FILE_SAVE_AS, &save_as_state))
         })
 }
 
-fn menu_button(
-    command_registry: CommandRegistry,
-    state: AppState,
-    editor: Editor,
-) -> impl IntoView {
+fn menu_button(command_registry: CommandRegistry, state: AppState) -> impl IntoView {
     Label::new("File")
         .style(|s| {
             s.selectable(false)
@@ -295,7 +348,7 @@ fn menu_button(
                 .hover(|s| s.background(Color::from_rgb8(232, 236, 240)))
                 .active(|s| s.background(Color::from_rgb8(218, 224, 230)))
         })
-        .popout_menu(move || command_menu(&command_registry, state.clone(), editor.clone()))
+        .popout_menu(move || command_menu(&command_registry, state.clone()))
 }
 
 fn supported_modifiers(modifiers: Modifiers) -> Modifiers {
@@ -346,7 +399,7 @@ fn resolve_shortcut_command(
     })
 }
 
-fn confirm_overlay(state: AppState, editor: Editor) -> Overlay {
+fn confirm_overlay(state: AppState) -> Overlay {
     let backdrop = Empty::new()
         .style(|s| {
             s.absolute()
@@ -362,18 +415,16 @@ fn confirm_overlay(state: AppState, editor: Editor) -> Overlay {
 
     let save_button = {
         let state = state.clone();
-        let editor = editor.clone();
         Button::new("Save").action(move || {
-            invoke_command(command_ids::FILE_SAVE, &state, &editor);
+            invoke_command(command_ids::FILE_SAVE, &state);
         })
     };
 
     let dont_save_button = {
         let state = state.clone();
-        let editor = editor.clone();
         Button::new("Don't Save").action(move || {
             if let Some(action) = state.pending_action.get_untracked() {
-                finish_pending_action(action, &state, &editor);
+                finish_pending_action(action, &state);
             } else {
                 state.show_confirm.set(false);
             }
@@ -395,8 +446,8 @@ fn confirm_overlay(state: AppState, editor: Editor) -> Overlay {
         let state = state.clone();
         Label::derived(move || match state.pending_action.get() {
             Some(PendingAction::CloseWindow(_)) => "Unsaved changes".to_string(),
-            Some(PendingAction::NewDocument) => "Start a new document?".to_string(),
-            Some(PendingAction::OpenFile(_)) => "Open a different file?".to_string(),
+            Some(PendingAction::NewDocument { .. }) => "Start a new document?".to_string(),
+            Some(PendingAction::OpenFile { .. }) => "Open a different file?".to_string(),
             None => "Unsaved changes".to_string(),
         })
     }
@@ -408,10 +459,10 @@ fn confirm_overlay(state: AppState, editor: Editor) -> Overlay {
             Some(PendingAction::CloseWindow(_)) => {
                 "Save your changes before closing this window?".to_string()
             }
-            Some(PendingAction::NewDocument) => {
+            Some(PendingAction::NewDocument { .. }) => {
                 "Save your changes before starting a new document?".to_string()
             }
-            Some(PendingAction::OpenFile(_)) => {
+            Some(PendingAction::OpenFile { .. }) => {
                 "Save your changes before opening a different file?".to_string()
             }
             None => "Save your changes before continuing?".to_string(),
@@ -422,7 +473,7 @@ fn confirm_overlay(state: AppState, editor: Editor) -> Overlay {
     let target_path = {
         let state = state.clone();
         Label::derived(move || match state.pending_action.get() {
-            Some(PendingAction::OpenFile(path)) => path.display().to_string(),
+            Some(PendingAction::OpenFile { path, .. }) => path.display().to_string(),
             _ => String::new(),
         })
     }
@@ -440,7 +491,10 @@ fn confirm_overlay(state: AppState, editor: Editor) -> Overlay {
                 .border_color(Color::from_rgb8(228, 232, 237))
                 .border_radius(8.0)
                 .apply_if(
-                    !matches!(state.pending_action.get(), Some(PendingAction::OpenFile(_))),
+                    !matches!(
+                        state.pending_action.get(),
+                        Some(PendingAction::OpenFile { .. })
+                    ),
                     |s| s.hide(),
                 )
         }
@@ -474,12 +528,13 @@ fn confirm_overlay(state: AppState, editor: Editor) -> Overlay {
 
 fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     let file_path = RwSignal::new(std::env::args().nth(1).map(PathBuf::from));
+    let active_document = RwSignal::new(None::<DocumentState>);
     let status_message = RwSignal::new(None::<String>);
     let pending_action = RwSignal::new(None::<PendingAction>);
     let show_confirm = RwSignal::new(false);
     let save_as_dialog_open = RwSignal::new(false);
     let state = AppState {
-        file_path,
+        active_document,
         status_message,
         pending_action,
         show_confirm,
@@ -493,7 +548,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
                 state
                     .status_message
                     .set(Some(format!("Failed to open {}: {err}", path.display())));
-                state.file_path.set(None);
+                file_path.set(None);
                 String::new()
             }
         },
@@ -509,9 +564,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
         move |editor_sig: RwSignal<Editor>, keypress| {
             if let Some(command_id) = resolve_shortcut_command(&command_registry_for_keys, keypress)
             {
-                editor_sig.with_untracked(|editor| {
-                    invoke_command(command_id, &state_for_keys, editor);
-                });
+                invoke_command(command_id, &state_for_keys);
                 return CommandExecuted::Yes;
             }
 
@@ -520,21 +573,24 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     );
 
     let editor_state = editor.editor().clone();
-
-    let main_menu = menu_button(
-        bootstrap.command_registry.clone(),
-        state.clone(),
+    state.active_document.set(Some(DocumentState::new(
+        DocumentId::initial(),
+        file_path,
         editor_state.clone(),
-    );
+    )));
 
-    let top_bar_editor = editor_state.clone();
+    let main_menu = menu_button(bootstrap.command_registry.clone(), state.clone());
+
     let top_bar = {
         let state = state.clone();
         Stack::horizontal((
             main_menu,
             Label::derived(move || {
-                let path = state.file_path.get();
-                let doc = top_bar_editor.doc_track();
+                let Some(document) = state.active_document.get() else {
+                    return current_name(None);
+                };
+                let path = document.file_path.get();
+                let doc = document.editor.doc_track();
                 let modified = if doc.dirty().get() { " *" } else { "" };
                 format!("{}{}", current_name(path.as_deref()), modified)
             })
@@ -582,9 +638,6 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
                 .border_color(Color::from_rgb8(220, 223, 227))
         });
 
-    let title_editor = editor_state.clone();
-    let close_editor = editor_state.clone();
-
     Stack::new((
         Stack::vertical((top_bar, status_strip, editor_view)).style(|s| {
             s.size_full()
@@ -592,14 +645,17 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
                 .row_gap(0.0)
                 .background(Color::from_rgb8(247, 243, 233))
         }),
-        confirm_overlay(state.clone(), editor_state),
+        confirm_overlay(state.clone()),
     ))
     .style(|s| s.size_full())
     .window_title({
         let state = state.clone();
         move || {
-            let path = state.file_path.get();
-            let doc = title_editor.doc_track();
+            let Some(document) = state.active_document.get() else {
+                return current_name(None);
+            };
+            let path = document.file_path.get();
+            let doc = document.editor.doc_track();
             let modified = if doc.dirty().get() { " *" } else { "" };
             format!("{}{}", current_name(path.as_deref()), modified)
         }
@@ -607,7 +663,10 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     .on_event_cont(listener::WindowCloseRequested, {
         let state = state.clone();
         move |cx, _| {
-            if close_editor.doc().is_dirty() {
+            let Some(document) = state.active_document() else {
+                return;
+            };
+            if document.editor.doc().is_dirty() {
                 cx.prevent_default();
                 state
                     .pending_action
