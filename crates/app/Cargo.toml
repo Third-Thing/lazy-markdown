@@ -1,0 +1,13 @@
+[package]
+name = "lazy-markdown"
+description = "The laziest, most efficient markdown editor (citation needed)."
+readme = "../../README.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+lazy-markdown-core.workspace = true
+floem.workspace = true
+atomic-write-file.workspace = true
