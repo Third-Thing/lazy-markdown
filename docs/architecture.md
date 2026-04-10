@@ -6,7 +6,7 @@ The split keeps reusable command descriptions in `core` while the app owns edito
 
 ## How It Works
 
-The app is the host. It owns the window, the active document, editor state, file dialogs, saves, and status messages.
+The app is the host. It owns the window, the document set, editor state, file dialogs, saves, and status messages.
 
 The core crate is the shared rulebook for commands. It defines command IDs, command titles, default shortcuts, and placement hints for UI surfaces such as a menu or command palette.
 
@@ -19,6 +19,8 @@ At startup, the host builds its command list:
 After startup, user actions go through commands. A menu item and a keyboard shortcut both ask the host to run the same command ID. For example, choosing Save and pressing the Save shortcut both run `file.save`.
 
 When `file.save` runs, the host checks whether the active document already has a file path. If it does, the host writes that document's text to the path. If it does not, the host opens a Save As dialog first, then writes to the selected path.
+
+`file.new` creates a new tab with its own editor and document state. `file.open` opens the selected file in a new tab, or activates the existing tab if that path is already open.
 
 Saves are atomic. The app writes the editor text into a temporary file, then commits the temporary file over the destination path after the write succeeds. The editor text is written from rope chunks through a buffered writer, so saving does not first build one full `String` copy of the document.
 
@@ -49,9 +51,9 @@ Each command has a stable ID, title, optional default shortcut, and placement hi
 
 - Floem views and styles.
 - File open and save dialogs.
-- Active document state, including its editor and file path.
+- Document set state, including per-tab editor and file path data.
 - Dirty and pristine document updates.
-- Pending open, close, and new-document flows.
+- Pending close-tab and close-window flows.
 - Status messages.
 - Shortcut translation.
 - Command dispatch.
@@ -78,7 +80,7 @@ The save path is:
 
 The app keeps ownership of all user-facing save behavior. That includes Save As dialogs, pending close/open flow, dirty/pristine updates, and status messages.
 
-Document-owned state is separate from app/window state. `DocumentState` stores a document ID, file path, and editor. `DocumentSet` stores the documents and active document ID. `AppState` stores the document set plus window-level status, pending actions, confirmation overlay state, and dialog flags. This keeps the single-document app behavior intact while preparing the host to manage multiple documents as tabs.
+Document-owned state is separate from app/window state. `DocumentState` stores a document ID, file path, and editor. `DocumentSet` stores the tabs, active document ID, and next document ID. `AppState` stores the document set plus window-level status, pending actions, confirmation overlay state, dialog flags, and the scope used to create new editors.
 
 ## Current Limits
 

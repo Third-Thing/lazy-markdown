@@ -13,15 +13,15 @@ It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tr
 - floem's built-in undo/redo
 - floem's built-in save/open dialogs
 - floem's built-in gutter (line numbers)
+- tabs with per-tab dirty state
 - menu actions and hotkeys for new/save/save-as/open
-- custom save or discard on close overlay
+- custom save or discard on tab/window close overlay
 - atomic writing
 
 ## Primary planned features
 
 ### v0.3.0
 
-- tabs
 - recent documents list
 
 ### Beyond
