@@ -1,5 +1,13 @@
 use std::collections::BTreeMap;
 
+use floem::prelude::SignalUpdate;
+
+use crate::{
+    documents::{create_new_tab, request_open, request_save, request_save_as},
+    state::AppState,
+};
+
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ShortcutModifier {
     Control,
@@ -8,6 +16,7 @@ pub enum ShortcutModifier {
     Meta,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ShortcutKey {
     Character(&'static str),
@@ -20,6 +29,7 @@ pub struct Shortcut {
     pub modifiers: &'static [ShortcutModifier],
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CommandPlacement {
     Menu,
@@ -41,10 +51,6 @@ pub struct CommandRegistry {
 }
 
 impl CommandRegistry {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn register(&mut self, command: CommandMetadata) -> Result<(), String> {
         if self.commands.contains_key(command.id) {
             return Err(format!("Duplicate command id `{}`", command.id));
@@ -61,17 +67,28 @@ impl CommandRegistry {
     pub fn iter(&self) -> impl Iterator<Item = &CommandMetadata> {
         self.commands.values()
     }
+}
 
-    pub fn commands_for_placement(&self, placement: CommandPlacement) -> Vec<CommandMetadata> {
-        self.commands
-            .values()
-            .copied()
-            .filter(|command| command.placements.contains(&placement))
-            .collect()
+#[derive(Clone, Default)]
+pub struct ModuleRegistry {
+    commands: CommandRegistry,
+}
+
+impl ModuleRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn commands(&self) -> &CommandRegistry {
+        &self.commands
+    }
+
+    pub fn commands_mut(&mut self) -> &mut CommandRegistry {
+        &mut self.commands
     }
 }
 
-pub mod ids {
+pub mod command_ids {
     pub const FILE_NEW: &str = "file.new";
     pub const FILE_OPEN: &str = "file.open";
     pub const FILE_SAVE: &str = "file.save";
@@ -84,7 +101,7 @@ const FILE_COMMAND_PLACEMENTS: &[CommandPlacement] =
     &[CommandPlacement::Menu, CommandPlacement::Palette];
 
 const FILE_NEW_COMMAND: CommandMetadata = CommandMetadata {
-    id: ids::FILE_NEW,
+    id: command_ids::FILE_NEW,
     title: "New",
     default_shortcut: Some(Shortcut {
         key: ShortcutKey::Character("n"),
@@ -94,7 +111,7 @@ const FILE_NEW_COMMAND: CommandMetadata = CommandMetadata {
 };
 
 const FILE_OPEN_COMMAND: CommandMetadata = CommandMetadata {
-    id: ids::FILE_OPEN,
+    id: command_ids::FILE_OPEN,
     title: "Open",
     default_shortcut: Some(Shortcut {
         key: ShortcutKey::Character("o"),
@@ -104,7 +121,7 @@ const FILE_OPEN_COMMAND: CommandMetadata = CommandMetadata {
 };
 
 const FILE_SAVE_COMMAND: CommandMetadata = CommandMetadata {
-    id: ids::FILE_SAVE,
+    id: command_ids::FILE_SAVE,
     title: "Save",
     default_shortcut: Some(Shortcut {
         key: ShortcutKey::Character("s"),
@@ -114,7 +131,7 @@ const FILE_SAVE_COMMAND: CommandMetadata = CommandMetadata {
 };
 
 const FILE_SAVE_AS_COMMAND: CommandMetadata = CommandMetadata {
-    id: ids::FILE_SAVE_AS,
+    id: command_ids::FILE_SAVE_AS,
     title: "Save As",
     default_shortcut: Some(Shortcut {
         key: ShortcutKey::Character("s"),
@@ -136,4 +153,42 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), S
     }
 
     Ok(())
+}
+
+pub(crate) fn invoke_command(command_id: &str, state: &AppState) {
+    match command_id {
+        command_ids::FILE_NEW => create_new_tab(state),
+        command_ids::FILE_OPEN => request_open(state.clone()),
+        command_ids::FILE_SAVE => {
+            let Some(document) = state.active_document_untracked() else {
+                state
+                    .status_message
+                    .set(Some("No active document".to_string()));
+                return;
+            };
+            request_save(state, &document);
+        }
+        command_ids::FILE_SAVE_AS => {
+            let Some(document) = state.active_document_untracked() else {
+                state
+                    .status_message
+                    .set(Some("No active document".to_string()));
+                return;
+            };
+            request_save_as(state.clone(), document);
+        }
+        _ => state
+            .status_message
+            .set(Some(format!("Unknown command `{command_id}`"))),
+    }
+}
+
+pub(crate) fn command_title(
+    command_registry: &CommandRegistry,
+    command_id: &'static str,
+) -> &'static str {
+    command_registry
+        .get(command_id)
+        .map(|command| command.title)
+        .unwrap_or(command_id)
 }

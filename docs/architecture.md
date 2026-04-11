@@ -1,14 +1,14 @@
 # Architecture
 
-`lazy-markdown` is a Cargo workspace split into a small core crate and a Floem app crate.
+`lazy-markdown` is a single Cargo crate with a small command-model layer and a Floem host in the same source tree.
 
-The split keeps reusable command descriptions in `core` while the app owns editor behavior, saving, dialogs, and UI state.
+The command model stays separate at the module level so command descriptions remain independent from the UI code, while the host owns editor behavior, saving, dialogs, and UI state.
 
 ## How It Works
 
-The app is the host. It owns the window, the document set, editor state, file dialogs, saves, and status messages.
+The app host owns the window, the document set, editor state, file dialogs, saves, and status messages.
 
-The core crate is the shared rulebook for commands. It defines command IDs, command titles, default shortcuts, and placement hints for UI surfaces such as a menu or command palette.
+The command model is the shared rulebook for commands. It defines command IDs, command titles, default shortcuts, and placement hints for UI surfaces such as a menu or command palette.
 
 At startup, the host builds its command list:
 
@@ -26,17 +26,21 @@ Saves are atomic. The app writes the editor text into a temporary file, then com
 
 ## Project Layout
 
-- `crates/core` defines command metadata and command/module registries. It should stay independent from Floem where practical.
-- `crates/app` contains the Floem UI, startup wiring, command dispatch, dialog handling, editor state, document flow, and atomic save implementation.
+- `src/commands.rs` defines command metadata and the command registry. It should stay independent from Floem where practical.
+- `src/state.rs` holds app and document state.
+- `src/documents.rs` owns document lifecycle and file read/write flows.
+- `src/shortcuts.rs` maps keypresses to commands.
+- `src/views/` contains Floem view code grouped by UI area.
+- `src/main.rs` handles startup and app composition.
 
-## Core
+## Command Model
 
-`core` currently owns the contracts that command providers and the app share:
+`commands.rs` currently owns the contracts that command providers and the app share:
 
 - `CommandRegistry` stores command metadata by stable command ID.
 - `ModuleRegistry` groups command registration so future modules can register commands through one host-facing entry point.
 
-The built-in file commands currently live in `core`:
+The built-in file commands currently live in `commands.rs`:
 
 - `file.new`
 - `file.open`
@@ -45,9 +49,9 @@ The built-in file commands currently live in `core`:
 
 Each command has a stable ID, title, optional default shortcut, and placement hints for UI surfaces such as menu and palette.
 
-## App Host
+## Host
 
-`app` owns UI state and user interaction:
+The host owns UI state and user interaction:
 
 - Floem views and styles.
 - File open and save dialogs.

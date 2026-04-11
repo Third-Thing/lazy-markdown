@@ -1946,12 +1946,7 @@ version = "0.1.0"
 dependencies = [
  "atomic-write-file",
  "floem",
- "lazy-markdown-core",
 ]
-
-[[package]]
-name = "lazy-markdown-core"
-version = "0.1.0"
 
 [[package]]
 name = "libc"
