@@ -266,6 +266,64 @@ impl AppState {
     }
 }
 
+#[derive(Clone)]
+struct AppMenuModel {
+    id: &'static str,
+    title: String,
+    entries: Vec<AppMenuEntry>,
+}
+
+impl AppMenuModel {
+    fn new(id: &'static str, title: impl Into<String>, entries: Vec<AppMenuEntry>) -> Self {
+        Self {
+            id,
+            title: title.into(),
+            entries,
+        }
+    }
+}
+
+#[derive(Clone)]
+enum AppMenuEntry {
+    Separator,
+    Item(AppMenuItem),
+}
+
+impl AppMenuEntry {
+    fn item(title: impl Into<String>, action: impl Fn(&AppState) + 'static) -> Self {
+        Self::Item(AppMenuItem::new(title, action))
+    }
+
+    fn disabled(title: impl Into<String>) -> Self {
+        Self::Item(AppMenuItem::disabled(title))
+    }
+}
+
+#[derive(Clone)]
+struct AppMenuItem {
+    title: String,
+    enabled: bool,
+    action: Option<Rc<dyn Fn(&AppState)>>,
+}
+
+impl AppMenuItem {
+    fn new(title: impl Into<String>, action: impl Fn(&AppState) + 'static) -> Self {
+        Self {
+            title: title.into(),
+            enabled: true,
+            action: Some(Rc::new(action)),
+        }
+    }
+
+    fn disabled(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            enabled: false,
+            action: None,
+        }
+    }
+}
+
 fn current_name(path: Option<&Path>) -> String {
     path.and_then(|path| path.file_name())
         .map(|name| name.to_string_lossy().into_owned())
@@ -614,35 +672,69 @@ fn command_title(command_registry: &CommandRegistry, command_id: &'static str) -
         .unwrap_or(command_id)
 }
 
-fn command_menu(command_registry: &CommandRegistry, state: AppState) -> Menu {
-    let new_title = command_title(command_registry, command_ids::FILE_NEW);
-    let open_title = command_title(command_registry, command_ids::FILE_OPEN);
-    let save_title = command_title(command_registry, command_ids::FILE_SAVE);
-    let save_as_title = command_title(command_registry, command_ids::FILE_SAVE_AS);
-
-    let new_state = state.clone();
-    let open_state = state.clone();
-    let save_state = state.clone();
-    let save_as_state = state;
-
-    Menu::new()
-        .item(new_title, move |item| {
-            item.action(move || invoke_command(command_ids::FILE_NEW, &new_state))
-        })
-        .item(open_title, move |item| {
-            item.action(move || invoke_command(command_ids::FILE_OPEN, &open_state))
-        })
-        .separator()
-        .item(save_title, move |item| {
-            item.action(move || invoke_command(command_ids::FILE_SAVE, &save_state))
-        })
-        .item(save_as_title, move |item| {
-            item.action(move || invoke_command(command_ids::FILE_SAVE_AS, &save_as_state))
-        })
+fn command_menu_entry(
+    command_registry: &CommandRegistry,
+    command_id: &'static str,
+) -> AppMenuEntry {
+    let title = command_title(command_registry, command_id).to_string();
+    AppMenuEntry::item(title, move |state| invoke_command(command_id, state))
 }
 
-fn menu_button(command_registry: CommandRegistry, state: AppState) -> impl IntoView {
-    Label::new("File")
+fn file_menu_model(command_registry: &CommandRegistry) -> AppMenuModel {
+    AppMenuModel::new(
+        "file",
+        "File",
+        vec![
+            command_menu_entry(command_registry, command_ids::FILE_NEW),
+            command_menu_entry(command_registry, command_ids::FILE_OPEN),
+            AppMenuEntry::Separator,
+            command_menu_entry(command_registry, command_ids::FILE_SAVE),
+            command_menu_entry(command_registry, command_ids::FILE_SAVE_AS),
+        ],
+    )
+}
+
+fn recent_menu_model() -> AppMenuModel {
+    AppMenuModel::new(
+        "recent",
+        "Recent",
+        vec![AppMenuEntry::disabled("No recent files yet")],
+    )
+}
+
+fn app_menu_models(command_registry: &CommandRegistry) -> Vec<AppMenuModel> {
+    vec![file_menu_model(command_registry), recent_menu_model()]
+}
+
+fn build_menu_entry(menu: Menu, entry: &AppMenuEntry, state: AppState) -> Menu {
+    match entry {
+        AppMenuEntry::Separator => menu.separator(),
+        AppMenuEntry::Item(item) => {
+            let title = item.title.clone();
+            let enabled = item.enabled;
+            let action = item.action.clone();
+            menu.item(title, move |menu_item| {
+                let menu_item = menu_item.enabled(enabled);
+                let Some(action) = action.clone() else {
+                    return menu_item;
+                };
+                let click_state = state.clone();
+                menu_item.action(move || action(&click_state))
+            })
+        }
+    }
+}
+
+fn build_menu_from_model(menu_model: &AppMenuModel, state: AppState) -> Menu {
+    let mut menu = Menu::new();
+    for entry in &menu_model.entries {
+        menu = build_menu_entry(menu, entry, state.clone());
+    }
+    menu
+}
+
+fn menu_button(menu_model: AppMenuModel, state: AppState) -> impl IntoView {
+    Label::new(menu_model.title.clone())
         .style(|s| {
             s.selectable(false)
                 .padding_horiz(10.0)
@@ -654,7 +746,16 @@ fn menu_button(command_registry: CommandRegistry, state: AppState) -> impl IntoV
                 .hover(|s| s.background(Color::from_rgb8(232, 236, 240)))
                 .active(|s| s.background(Color::from_rgb8(218, 224, 230)))
         })
-        .popout_menu(move || command_menu(&command_registry, state.clone()))
+        .popout_menu(move || build_menu_from_model(&menu_model, state.clone()))
+}
+
+fn menu_bar_view(command_registry: CommandRegistry, state: AppState) -> impl IntoView {
+    dyn_stack(
+        move || app_menu_models(&command_registry),
+        |menu| menu.id,
+        move |menu| menu_button(menu, state.clone()),
+    )
+    .style(|s| s.flex_row().col_gap(6.0))
 }
 
 fn supported_modifiers(modifiers: Modifiers) -> Modifiers {
@@ -979,12 +1080,12 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     );
     state.documents.set(DocumentSet::new(initial_document));
 
-    let main_menu = menu_button(bootstrap.command_registry.clone(), state.clone());
+    let menu_bar = menu_bar_view(bootstrap.command_registry.clone(), state.clone());
 
     let top_bar = {
         let state = state.clone();
         Stack::horizontal((
-            main_menu,
+            menu_bar,
             Label::derived(move || {
                 let Some(document) = state.active_document() else {
                     return current_name(None);
