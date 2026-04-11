@@ -3,6 +3,7 @@ use std::path::PathBuf;
 mod bootstrap;
 mod commands;
 mod documents;
+mod recent_files;
 mod shortcuts;
 mod state;
 mod theme;
@@ -18,13 +19,22 @@ use floem::{
     views::{Label, Stack},
     window::{WindowConfig, WindowId},
 };
+use recent_files::{RecentFiles, load_recent_files, record_recent_file};
 use state::{AppState, DocumentId, DocumentSet, PendingAction};
 use views::{
     dialogs::confirm_overlay, editor::tab_content_view, menu::menu_bar_view, tabs::tab_strip_view,
 };
 
 fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
-    let state = AppState::new(Scope::current());
+    let (recent_files, recent_files_error) = match load_recent_files() {
+        Ok(recent_files) => (recent_files, None),
+        Err(err) => (RecentFiles::default(), Some(err)),
+    };
+    let state = AppState::new(Scope::current(), recent_files);
+
+    if let Some(err) = recent_files_error {
+        state.status_message.set(Some(err));
+    }
 
     let mut initial_path = std::env::args().nth(1).map(PathBuf::from);
     let initial_text = match initial_path.as_ref() {
@@ -48,6 +58,12 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
         initial_text,
     );
     state.documents.set(DocumentSet::new(initial_document));
+    if let Some(path) = state
+        .active_document_untracked()
+        .and_then(|document| document.file_path.get_untracked())
+    {
+        record_recent_file(&state, &path);
+    }
 
     let menu_bar = menu_bar_view(bootstrap.command_registry.clone(), state.clone());
 

@@ -6,6 +6,8 @@ use floem::{
     views::editor::Editor,
 };
 
+use crate::recent_files::RecentFiles;
+
 #[derive(Clone)]
 pub(crate) enum PendingAction {
     CloseDocument {
@@ -163,6 +165,7 @@ impl DocumentSet {
 pub(crate) struct AppState {
     pub(crate) document_scope: Scope,
     pub(crate) documents: RwSignal<DocumentSet>,
+    pub(crate) recent_files: RwSignal<RecentFiles>,
     pub(crate) status_message: RwSignal<Option<String>>,
     pub(crate) pending_action: RwSignal<Option<PendingAction>>,
     pub(crate) show_confirm: RwSignal<bool>,
@@ -170,10 +173,11 @@ pub(crate) struct AppState {
 }
 
 impl AppState {
-    pub(crate) fn new(document_scope: Scope) -> Self {
+    pub(crate) fn new(document_scope: Scope, recent_files: RecentFiles) -> Self {
         Self {
             document_scope,
             documents: RwSignal::new(DocumentSet::empty()),
+            recent_files: RwSignal::new(recent_files),
             status_message: RwSignal::new(None::<String>),
             pending_action: RwSignal::new(None::<PendingAction>),
             show_confirm: RwSignal::new(false),

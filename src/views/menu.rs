@@ -3,12 +3,15 @@ use std::rc::Rc;
 use floem::{
     menu::Menu,
     peniko::Color,
-    prelude::*,
+    prelude::{SignalGet, *},
     views::{Label, dyn_stack},
 };
 
 use crate::{
     commands::{CommandRegistry, command_ids, command_title, invoke_command},
+    documents::current_name,
+    documents::open_document_path,
+    recent_files::clear_recent_files,
     state::AppState,
 };
 
@@ -92,16 +95,33 @@ fn file_menu_model(command_registry: &CommandRegistry) -> AppMenuModel {
     )
 }
 
-fn recent_menu_model() -> AppMenuModel {
-    AppMenuModel::new(
-        "recent",
-        "Recent",
-        vec![AppMenuEntry::disabled("No recent files yet")],
-    )
+fn recent_menu_label(path: &std::path::Path) -> String {
+    let name = current_name(Some(path));
+    format!("{name} ({})", path.display())
 }
 
-fn app_menu_models(command_registry: &CommandRegistry) -> Vec<AppMenuModel> {
-    vec![file_menu_model(command_registry), recent_menu_model()]
+fn recent_menu_model(state: &AppState) -> AppMenuModel {
+    let recent_paths = state.recent_files.get().paths();
+    let mut entries: Vec<AppMenuEntry> = recent_paths
+        .into_iter()
+        .map(|path| {
+            let title = recent_menu_label(&path);
+            AppMenuEntry::item(title, move |state| open_document_path(state, path.clone()))
+        })
+        .collect();
+
+    if entries.is_empty() {
+        entries.push(AppMenuEntry::disabled("No recent files yet"));
+    } else {
+        entries.push(AppMenuEntry::Separator);
+        entries.push(AppMenuEntry::item("Clear Menu", clear_recent_files));
+    }
+
+    AppMenuModel::new("recent", "Recent", entries)
+}
+
+fn app_menu_models(command_registry: &CommandRegistry, state: &AppState) -> Vec<AppMenuModel> {
+    vec![file_menu_model(command_registry), recent_menu_model(state)]
 }
 
 fn build_menu_entry(menu: Menu, entry: &AppMenuEntry, state: AppState) -> Menu {
@@ -148,8 +168,9 @@ fn menu_button(menu_model: AppMenuModel, state: AppState) -> impl IntoView {
 }
 
 pub(crate) fn menu_bar_view(command_registry: CommandRegistry, state: AppState) -> impl IntoView {
+    let menu_state = state.clone();
     dyn_stack(
-        move || app_menu_models(&command_registry),
+        move || app_menu_models(&command_registry, &menu_state),
         |menu| menu.id,
         move |menu| menu_button(menu, state.clone()),
     )

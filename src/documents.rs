@@ -18,7 +18,10 @@ use floem::{
     window::WindowId,
 };
 
-use crate::state::{AppState, DocumentId, DocumentState, PendingAction, save_target_path};
+use crate::{
+    recent_files::{record_recent_file, remove_recent_file},
+    state::{AppState, DocumentId, DocumentState, PendingAction, save_target_path},
+};
 
 pub(crate) fn current_name(path: Option<&Path>) -> String {
     path.and_then(|path| path.file_name())
@@ -82,6 +85,7 @@ fn save_document_to_path(state: &AppState, document: &DocumentState, path: &Path
         Ok(()) => {
             document.editor.doc().mark_pristine();
             document.file_path.set(Some(path.to_path_buf()));
+            record_recent_file(state, path);
             state
                 .status_message
                 .set(Some(format!("Saved {}", path.display())));
@@ -133,9 +137,10 @@ pub(crate) fn create_new_tab(state: &AppState) {
         .set(Some("Started a new document".to_string()));
 }
 
-fn open_document_in_tab(state: &AppState, path: PathBuf) {
+pub(crate) fn open_document_path(state: &AppState, path: PathBuf) {
     if let Some(document) = state.find_document_by_path_untracked(&path) {
         activate_document(state, document.id());
+        record_recent_file(state, &path);
         state
             .status_message
             .set(Some(format!("Switched to {}", path.display())));
@@ -146,11 +151,15 @@ fn open_document_in_tab(state: &AppState, path: PathBuf) {
         Ok(text) => {
             let document = create_and_activate_document(state, Some(path.clone()), text);
             activate_document(state, document.id());
+            record_recent_file(state, &path);
             state
                 .status_message
                 .set(Some(format!("Opened {}", path.display())));
         }
         Err(err) => {
+            if err.kind() == std::io::ErrorKind::NotFound {
+                remove_recent_file(state, &path);
+            }
             state
                 .status_message
                 .set(Some(format!("Failed to open {}: {err}", path.display())));
@@ -287,6 +296,6 @@ pub(crate) fn request_open(state: AppState) {
             return;
         };
 
-        open_document_in_tab(&state, path);
+        open_document_path(&state, path);
     });
 }
