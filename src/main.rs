@@ -71,42 +71,48 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
 
     let menu_bar = menu_bar_view(bootstrap.command_registry.clone(), state.clone());
 
-    let top_bar = {
-        let state = state.clone();
-        Stack::horizontal((
-            menu_bar,
+    let top_bar = menu_bar.style(|s| {
+        s.width_full()
+            .padding_horiz(10.0)
+            .padding_vert(9.0)
+            .background(Color::from_rgb8(236, 232, 221))
+    });
+
+    let status_strip = Stack::horizontal((
+        {
+            let state = state.clone();
             Label::derived(move || {
                 let Some(document) = state.active_document() else {
                     return current_name(None);
                 };
                 document_title_text(&document)
             })
-            .style(|s| {
-                s.font_size(13.0)
-                    .font_bold()
-                    .color(Color::from_rgb8(44, 50, 63))
-            }),
-        ))
-    }
+        }
+        .style(|s| {
+            s.font_size(12.0)
+                .font_bold()
+                .color(Color::from_rgb8(58, 62, 72))
+        }),
+        {
+            let state = state.clone();
+            Label::derived(move || state.status_message.get().unwrap_or_default())
+        }
+        .style(|s| {
+            s.font_size(12.0)
+                .color(Color::from_rgb8(82, 89, 102))
+                .text_ellipsis()
+                .min_width(0.0)
+                .flex_grow(1.0)
+                .justify_end()
+        }),
+    ))
     .style(|s| {
         s.width_full()
-            .justify_between()
             .items_center()
-            .padding_horiz(10.0)
-            .padding_vert(9.0)
-            .background(Color::from_rgb8(236, 232, 221))
-    });
-
-    let status_strip = {
-        let state = state.clone();
-        Label::derived(move || state.status_message.get().unwrap_or_default())
-    }
-    .style(|s| {
-        s.width_full()
+            .justify_between()
+            .col_gap(12.0)
             .padding_horiz(12.0)
             .padding_vert(8.0)
-            .font_size(12.0)
-            .color(Color::from_rgb8(82, 89, 102))
             .background(Color::from_rgb8(243, 239, 230))
             .border_top(1.0)
             .border_color(Color::from_rgb8(220, 223, 227))

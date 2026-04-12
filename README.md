@@ -24,6 +24,7 @@ It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tr
 ### v0.4.0
 
 - folder view
+- font selector
 
 ### Beyond
 
