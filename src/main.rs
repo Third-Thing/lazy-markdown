@@ -74,7 +74,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     let top_bar = menu_bar.style(|s| {
         s.width_full()
             .padding_horiz(10.0)
-            .padding_vert(9.0)
+            .padding_vert(6.0)
             .background(Color::from_rgb8(236, 232, 221))
     });
 

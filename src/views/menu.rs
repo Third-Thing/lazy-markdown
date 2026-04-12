@@ -351,15 +351,15 @@ fn menu_button(
             .style(move |s| {
                 let is_active = state.menu_state.get().open_menu == Some(menu_model.id);
                 s.selectable(false)
-                    .padding_horiz(10.0)
-                    .padding_vert(6.0)
+                    .padding_horiz(6.0)
+                    .padding_vert(3.0)
                     .border(1.0)
                     .border_color(if is_active {
                         Color::from_rgb8(162, 170, 182)
                     } else {
                         Color::from_rgb8(196, 199, 204)
                     })
-                    .border_radius(6.0)
+                    .border_radius(4.0)
                     .background(if is_active {
                         Color::from_rgb8(226, 231, 238)
                     } else {
