@@ -101,24 +101,22 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
         let state = state.clone();
         Label::derived(move || state.status_message.get().unwrap_or_default())
     }
-    .style({
-        let state = state.clone();
-        move |s| {
-            s.width_full()
-                .padding_horiz(12.0)
-                .padding_vert(8.0)
-                .font_size(12.0)
-                .color(Color::from_rgb8(82, 89, 102))
-                .background(Color::from_rgb8(243, 239, 230))
-                .apply_if(state.status_message.get().is_none(), |s| s.hide())
-        }
+    .style(|s| {
+        s.width_full()
+            .padding_horiz(12.0)
+            .padding_vert(8.0)
+            .font_size(12.0)
+            .color(Color::from_rgb8(82, 89, 102))
+            .background(Color::from_rgb8(243, 239, 230))
+            .border_top(1.0)
+            .border_color(Color::from_rgb8(220, 223, 227))
     });
 
     let tabs_strip = tab_strip_view(state.clone());
     let tabs_content = tab_content_view(state.clone());
 
     Stack::new((
-        Stack::vertical((top_bar, tabs_strip, status_strip, tabs_content)).style(|s| {
+        Stack::vertical((top_bar, tabs_strip, tabs_content, status_strip)).style(|s| {
             s.size_full()
                 .padding(10.0)
                 .row_gap(0.0)
