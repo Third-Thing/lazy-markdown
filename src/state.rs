@@ -1,8 +1,13 @@
-use std::path::{Path, PathBuf};
+use std::{
+    cell::RefCell,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 use floem::{
     prelude::{RwSignal, SignalGet, SignalUpdate},
     reactive::Scope,
+    view::ViewId,
     views::editor::Editor,
 };
 
@@ -17,6 +22,59 @@ pub(crate) enum PendingAction {
         window_id: floem::window::WindowId,
         remaining_documents: Vec<DocumentId>,
     },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum TopLevelMenuId {
+    File,
+    Recent,
+}
+
+const MENU_ORDER: &[TopLevelMenuId] = &[TopLevelMenuId::File, TopLevelMenuId::Recent];
+
+impl TopLevelMenuId {
+    fn order_index(self) -> usize {
+        MENU_ORDER
+            .iter()
+            .position(|&id| id == self)
+            .expect("all variants must appear in MENU_ORDER")
+    }
+
+    pub(crate) fn next(self) -> Self {
+        MENU_ORDER[(self.order_index() + 1) % MENU_ORDER.len()]
+    }
+
+    pub(crate) fn previous(self) -> Self {
+        MENU_ORDER[(self.order_index() + MENU_ORDER.len() - 1) % MENU_ORDER.len()]
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub(crate) struct MenuUiState {
+    pub(crate) open_menu: Option<TopLevelMenuId>,
+    pub(crate) selected_index: usize,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct MenuPopupIds {
+    file: Option<ViewId>,
+    recent: Option<ViewId>,
+}
+
+impl MenuPopupIds {
+    fn popup_id(self, menu_id: TopLevelMenuId) -> Option<ViewId> {
+        match menu_id {
+            TopLevelMenuId::File => self.file,
+            TopLevelMenuId::Recent => self.recent,
+        }
+    }
+
+    fn set_popup_id(&mut self, menu_id: TopLevelMenuId, popup_id: ViewId) {
+        match menu_id {
+            TopLevelMenuId::File => self.file = Some(popup_id),
+            TopLevelMenuId::Recent => self.recent = Some(popup_id),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -165,6 +223,8 @@ impl DocumentSet {
 pub(crate) struct AppState {
     pub(crate) document_scope: Scope,
     pub(crate) documents: RwSignal<DocumentSet>,
+    pub(crate) menu_state: RwSignal<MenuUiState>,
+    menu_popup_ids: Rc<RefCell<MenuPopupIds>>,
     pub(crate) recent_files: RwSignal<RecentFiles>,
     pub(crate) status_message: RwSignal<Option<String>>,
     pub(crate) pending_action: RwSignal<Option<PendingAction>>,
@@ -177,6 +237,8 @@ impl AppState {
         Self {
             document_scope,
             documents: RwSignal::new(DocumentSet::empty()),
+            menu_state: RwSignal::new(MenuUiState::default()),
+            menu_popup_ids: Rc::new(RefCell::new(MenuPopupIds::default())),
             recent_files: RwSignal::new(recent_files),
             status_message: RwSignal::new(None::<String>),
             pending_action: RwSignal::new(None::<PendingAction>),
@@ -229,6 +291,16 @@ impl AppState {
 
     pub(crate) fn active_index(&self) -> Option<usize> {
         self.documents.get().active_index()
+    }
+
+    pub(crate) fn register_menu_popup(&self, menu_id: TopLevelMenuId, popup_id: ViewId) {
+        self.menu_popup_ids
+            .borrow_mut()
+            .set_popup_id(menu_id, popup_id);
+    }
+
+    pub(crate) fn menu_popup_id(&self, menu_id: TopLevelMenuId) -> Option<ViewId> {
+        self.menu_popup_ids.borrow().popup_id(menu_id)
     }
 
     pub(crate) fn find_document_by_path_untracked(&self, path: &Path) -> Option<DocumentState> {

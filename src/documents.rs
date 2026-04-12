@@ -114,6 +114,17 @@ pub(crate) fn activate_document(state: &AppState, document_id: DocumentId) {
     }
 }
 
+pub(crate) fn focus_active_document(state: &AppState) {
+    let Some(document_id) = state
+        .active_document_untracked()
+        .map(|document| document.id())
+    else {
+        return;
+    };
+
+    activate_document(state, document_id);
+}
+
 fn create_document(state: &AppState, file_path: Option<PathBuf>, text: String) -> DocumentState {
     let document_id = state.allocate_document_id();
     create_document_state(state.document_scope, document_id, file_path, text)

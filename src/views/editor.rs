@@ -1,40 +1,34 @@
 use floem::{
     peniko::Color,
     prelude::*,
+    reactive::Effect,
     views::{
-        editor::{command::CommandExecuted, keypress::KeypressMap, view::editor_container_view},
+        editor::{keypress::default_key_handler, view::editor_container_view},
         tab,
     },
 };
 
 use crate::{
-    commands::{CommandRegistry, invoke_command},
-    shortcuts::resolve_shortcut_command,
     state::{AppState, DocumentState},
     theme::editor_theme_style,
 };
 
-fn document_editor_view(
-    document: DocumentState,
-    command_registry: CommandRegistry,
-    state: AppState,
-) -> impl IntoView {
+fn document_editor_view(document: DocumentState, state: AppState) -> impl IntoView {
     let editor_sig = RwSignal::new(document.editor.clone());
-    let keymap = KeypressMap::default();
+    let document_id = document.id();
+    let focus_document = document.clone();
+    let focus_state = state;
 
-    editor_container_view(
-        editor_sig,
-        |_| true,
-        move |keypress| {
-            if let Some(command_id) = resolve_shortcut_command(&command_registry, &keypress) {
-                invoke_command(command_id, &state);
-                return CommandExecuted::Yes;
-            }
+    Effect::new(move |_| {
+        let is_active = focus_state.documents.get().active_document_id() == Some(document_id);
+        let view_id = focus_document.editor.editor_view_id.get();
 
-            keymap.handle_keypress(editor_sig, &keypress)
-        },
-    )
-    .style(|s| {
+        if is_active && let Some(view_id) = view_id {
+            view_id.request_focus();
+        }
+    });
+
+    editor_container_view(editor_sig, |_| true, default_key_handler(editor_sig)).style(|s| {
         s.apply(editor_theme_style())
             .width_full()
             .min_size(0, 0)
@@ -44,21 +38,15 @@ fn document_editor_view(
     })
 }
 
-pub(crate) fn tab_content_view(
-    state: AppState,
-    command_registry: CommandRegistry,
-) -> impl IntoView {
+pub(crate) fn tab_content_view(state: AppState) -> impl IntoView {
     let active_state = state.clone();
     let documents_state = state.clone();
-    let content_state = state;
 
     tab(
         move || active_state.active_index(),
         move || documents_state.documents(),
         DocumentState::id,
-        move |document| {
-            document_editor_view(document, command_registry.clone(), content_state.clone())
-        },
+        move |document| document_editor_view(document, state.clone()),
     )
     .style(|s| s.width_full().min_size(0, 0).flex_grow(1.0))
 }

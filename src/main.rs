@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+mod app_keys;
 mod bootstrap;
 mod commands;
 mod documents;
@@ -9,10 +10,12 @@ mod state;
 mod theme;
 mod views;
 
+use app_keys::{KeyHandling, app_key_event_config, handle_app_key_down};
 use bootstrap::AppBootstrap;
 use documents::{activate_document, create_document_state, current_name, document_title_text};
 use floem::{
     Application,
+    event::EventPropagation,
     peniko::Color,
     prelude::*,
     reactive::Scope,
@@ -21,6 +24,7 @@ use floem::{
 };
 use recent_files::{RecentFiles, load_recent_files, record_recent_file};
 use state::{AppState, DocumentId, DocumentSet, PendingAction};
+use views::menu::{close_menu, is_menu_open};
 use views::{
     dialogs::confirm_overlay, editor::tab_content_view, menu::menu_bar_view, tabs::tab_strip_view,
 };
@@ -111,7 +115,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     });
 
     let tabs_strip = tab_strip_view(state.clone());
-    let tabs_content = tab_content_view(state.clone(), bootstrap.command_registry.clone());
+    let tabs_content = tab_content_view(state.clone());
 
     Stack::new((
         Stack::vertical((top_bar, tabs_strip, status_strip, tabs_content)).style(|s| {
@@ -130,6 +134,25 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
                 return current_name(None);
             };
             document_title_text(&document)
+        }
+    })
+    .on_event_with_config(listener::KeyDown, app_key_event_config(), {
+        let state = state.clone();
+        let command_registry = bootstrap.command_registry.clone();
+        move |cx, event| match handle_app_key_down(&state, &command_registry, event) {
+            KeyHandling::Handled => {
+                cx.prevent_default();
+                EventPropagation::Stop
+            }
+            KeyHandling::NotHandled => EventPropagation::Continue,
+        }
+    })
+    .on_event_cont(listener::Click, {
+        let state = state.clone();
+        move |_, _| {
+            if is_menu_open(&state) {
+                close_menu(&state);
+            }
         }
     })
     .on_event_cont(listener::WindowCloseRequested, {

@@ -1,7 +1,4 @@
-use floem::{
-    prelude::{Key, Modifiers, NamedKey},
-    views::editor::keypress::KeypressKey,
-};
+use floem::prelude::{Key, KeyboardEvent, Modifiers, NamedKey};
 
 use crate::commands::{CommandRegistry, Shortcut, ShortcutKey, ShortcutModifier};
 
@@ -9,7 +6,7 @@ fn supported_modifiers(modifiers: Modifiers) -> Modifiers {
     modifiers & (Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT | Modifiers::META)
 }
 
-fn matches_shortcut(shortcut: Shortcut, keypress: &KeypressKey) -> bool {
+fn matches_shortcut(shortcut: Shortcut, keypress: &KeyboardEvent) -> bool {
     supported_modifiers(keypress.modifiers) == shortcut_modifiers(shortcut.modifiers)
         && shortcut_key_matches(shortcut.key, &keypress.key)
 }
@@ -43,7 +40,7 @@ fn shortcut_key_matches(shortcut_key: ShortcutKey, actual_key: &Key) -> bool {
 
 pub(crate) fn resolve_shortcut_command(
     command_registry: &CommandRegistry,
-    keypress: &KeypressKey,
+    keypress: &KeyboardEvent,
 ) -> Option<&'static str> {
     command_registry.iter().find_map(|command| {
         command

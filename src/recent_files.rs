@@ -23,6 +23,19 @@ impl RecentFiles {
         self.entries.clone()
     }
 
+    #[cfg(test)]
+    pub(crate) fn from_paths<I>(paths: I) -> Self
+    where
+        I: IntoIterator<Item = PathBuf>,
+        I::IntoIter: DoubleEndedIterator,
+    {
+        let mut recent_files = Self::default();
+        for path in paths.into_iter().rev() {
+            recent_files.add_path(&path);
+        }
+        recent_files
+    }
+
     fn add_path(&mut self, path: &Path) -> bool {
         if !path.exists() {
             return false;
@@ -99,6 +112,12 @@ fn recent_files_path() -> Result<PathBuf, String> {
 }
 
 fn store_recent_files(recent_files: &RecentFiles) -> Result<(), String> {
+    // Tests operate on the in-memory signal only; skip persisting to avoid
+    // overwriting the user's real recent-files.txt with temp paths.
+    if cfg!(test) {
+        return Ok(());
+    }
+
     let path = recent_files_path()?;
     let Some(parent) = path.parent() else {
         return Err(format!(

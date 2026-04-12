@@ -4,7 +4,7 @@ Goal: An efficient, safe, modular markdown editor with all dependencies written 
 
 ## Status
 
-This is currently a plain text notepad, with no markdown functionality (peak laziness).
+This is currently a plain text tabbed editor, with no markdown functionality (peak laziness).
 
 It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tree/dirty-tracking-and-stale-cursor-crash-fix) for proper dirty state tracking and a few crash fixes, while waiting for the [PRs](https://github.com/lapce/floem/pulls) to get merged.
 
@@ -21,6 +21,10 @@ It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tr
 
 ## Primary planned features
 
+### v0.4.0
+
+- folder view
+
 ### Beyond
 
 - lazy markdown parsing (manual trigger or debounce)
@@ -28,7 +32,6 @@ It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tr
 - configurable markdown normalization
 - convert pasted content to markdown
 - a secondary window for preview / rendering
-- folder view
 - search / replace
 - spell check
 - configuration file for style and hotkeys
