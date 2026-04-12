@@ -217,7 +217,7 @@ fn popup_row_view(menu_id: TopLevelMenuId, row: PopupRow, state: AppState) -> An
                         && menu_state.selected_index == row.index;
                     s.width_full()
                         .selectable(false)
-                        .font_size(13.0)
+                        .font_size(14.0)
                         .padding_horiz(12.0)
                         .padding_vert(7.0)
                         .color(if enabled {
@@ -226,9 +226,9 @@ fn popup_row_view(menu_id: TopLevelMenuId, row: PopupRow, state: AppState) -> An
                             Color::from_rgb8(148, 154, 166)
                         })
                         .background(if selected && enabled {
-                            Color::from_rgb8(230, 235, 242)
+                            Color::from_rgb8(210, 215, 222)
                         } else {
-                            Color::from_rgba8(0, 0, 0, 0)
+                            Color::from_rgb8(235, 237, 240)
                         })
                 })
                 .on_event_stop(listener::PointerEnter, move |_, _| {
@@ -282,7 +282,7 @@ fn popup_content_view(
             .padding(6.0)
             .border(1.0)
             .border_color(Color::from_rgb8(206, 211, 218))
-            .background(Color::from_rgb8(252, 252, 253))
+            .background(Color::from_rgb8(235, 237, 240))
             .z_index(200)
             .apply_if(!is_active, |s| s.hide())
     })
@@ -335,6 +335,7 @@ fn menu_button(
     let anchor_id = ViewId::new();
     let popup_id = ViewId::new();
     state.register_menu_popup(menu_model.id, popup_id);
+    popup_id.set_style_parent(anchor_id);
     let button_state = state.clone();
     let button_registry = command_registry.clone();
     let popup = popup_overlay(
