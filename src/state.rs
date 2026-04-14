@@ -22,6 +22,10 @@ pub(crate) enum PendingAction {
         window_id: floem::window::WindowId,
         remaining_documents: Vec<DocumentId>,
     },
+    ShowMessage {
+        title: String,
+        message: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -163,6 +167,10 @@ impl DocumentSet {
 
     pub(crate) fn documents(&self) -> Vec<DocumentState> {
         self.documents.clone()
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.documents.len()
     }
 
     pub(crate) fn next_document_id(&mut self) -> DocumentId {
@@ -309,6 +317,10 @@ impl AppState {
 
     pub(crate) fn dirty_document_ids_untracked(&self) -> Vec<DocumentId> {
         self.documents.get_untracked().dirty_document_ids()
+    }
+
+    pub(crate) fn document_count_untracked(&self) -> usize {
+        self.documents.get_untracked().len()
     }
 }
 

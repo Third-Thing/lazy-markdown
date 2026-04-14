@@ -70,6 +70,5 @@ pub(crate) fn tab_strip_view(state: AppState) -> impl IntoView {
             .col_gap(6.0)
             .background(Color::from_rgb8(241, 237, 228))
     })
-    .scroll()
     .style(|s| s.width_full().height(46.0))
 }

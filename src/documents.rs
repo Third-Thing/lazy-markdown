@@ -23,6 +23,8 @@ use crate::{
     state::{AppState, DocumentId, DocumentState, PendingAction, save_target_path},
 };
 
+const MAX_OPEN_TABS: usize = 5;
+
 pub(crate) fn current_name(path: Option<&Path>) -> String {
     path.and_then(|path| path.file_name())
         .map(|name| name.to_string_lossy().into_owned())
@@ -140,7 +142,30 @@ fn create_and_activate_document(
     document
 }
 
+fn show_tab_limit_dialog(state: &AppState) {
+    state.pending_action.set(Some(PendingAction::ShowMessage {
+        title: "Tab limit reached".to_string(),
+        message: format!(
+            "You can only keep {MAX_OPEN_TABS} tabs open at once. Close a tab before opening another file or creating a new document."
+        ),
+    }));
+    state.show_confirm.set(true);
+}
+
+fn ensure_tab_capacity(state: &AppState) -> bool {
+    if state.document_count_untracked() < MAX_OPEN_TABS {
+        return true;
+    }
+
+    show_tab_limit_dialog(state);
+    false
+}
+
 pub(crate) fn create_new_tab(state: &AppState) {
+    if !ensure_tab_capacity(state) {
+        return;
+    }
+
     let document = create_and_activate_document(state, None, String::new());
     activate_document(state, document.id());
     state
@@ -155,6 +180,10 @@ pub(crate) fn open_document_path(state: &AppState, path: PathBuf) {
         state
             .status_message
             .set(Some(format!("Switched to {}", path.display())));
+        return;
+    }
+
+    if !ensure_tab_capacity(state) {
         return;
     }
 
@@ -249,6 +278,7 @@ pub(crate) fn finish_pending_action(action: PendingAction, state: &AppState) {
         } => {
             advance_window_close(window_id, remaining_documents, state);
         }
+        PendingAction::ShowMessage { .. } => {}
     }
 }
 
@@ -292,6 +322,10 @@ pub(crate) fn request_save(state: &AppState, document: &DocumentState) {
 }
 
 pub(crate) fn request_open(state: AppState) {
+    if !ensure_tab_capacity(&state) {
+        return;
+    }
+
     let mut options = FileDialogOptions::new().title("Open file");
     if let Some(path) = state
         .active_document_untracked()
@@ -309,4 +343,118 @@ pub(crate) fn request_open(state: AppState) {
 
         open_document_path(&state, path);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use floem::{
+        headless::TestRoot,
+        prelude::{SignalGet, SignalUpdate},
+        reactive::Scope,
+    };
+
+    use crate::{
+        recent_files::RecentFiles,
+        state::{AppState, DocumentId, DocumentSet, PendingAction},
+    };
+
+    use super::{MAX_OPEN_TABS, create_document_state, create_new_tab, open_document_path};
+
+    #[test]
+    fn create_new_tab_shows_popup_at_limit() {
+        let _root = TestRoot::new();
+        let state = test_state_with_document_count(MAX_OPEN_TABS);
+
+        create_new_tab(&state);
+
+        assert_eq!(state.document_count_untracked(), MAX_OPEN_TABS);
+        assert!(state.show_confirm.get_untracked());
+        assert!(matches!(
+            state.pending_action.get_untracked(),
+            Some(PendingAction::ShowMessage { .. })
+        ));
+    }
+
+    #[test]
+    fn opening_new_file_shows_popup_at_limit() {
+        let _root = TestRoot::new();
+        let state = test_state_with_document_count(MAX_OPEN_TABS);
+        let path = temp_markdown_file("open-limit", "opened from disk");
+
+        open_document_path(&state, path.clone());
+
+        assert_eq!(state.document_count_untracked(), MAX_OPEN_TABS);
+        assert!(state.show_confirm.get_untracked());
+        assert!(matches!(
+            state.pending_action.get_untracked(),
+            Some(PendingAction::ShowMessage { .. })
+        ));
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn opening_existing_file_switches_tabs_even_at_limit() {
+        let _root = TestRoot::new();
+        let state = test_state_with_document_count(MAX_OPEN_TABS);
+        let target_path = temp_markdown_file("already-open", "opened from disk");
+        let target_document = create_document_state(
+            state.document_scope,
+            state.allocate_document_id(),
+            Some(target_path.clone()),
+            String::from("already open"),
+        );
+        let target_document_id = target_document.id();
+
+        let removed = state.remove_document(DocumentId::initial());
+        assert!(removed.is_some());
+        state.push_document(target_document);
+        assert_eq!(state.document_count_untracked(), MAX_OPEN_TABS);
+
+        open_document_path(&state, target_path.clone());
+
+        assert_eq!(
+            state.documents.get_untracked().active_document_id(),
+            Some(target_document_id)
+        );
+        assert!(!state.show_confirm.get_untracked());
+        assert!(state.pending_action.get_untracked().is_none());
+
+        let _ = fs::remove_file(target_path);
+    }
+
+    fn test_state_with_document_count(count: usize) -> AppState {
+        let scope = Scope::new();
+        let state = AppState::new(scope, RecentFiles::default());
+        let initial_document =
+            create_document_state(scope, DocumentId::initial(), None, String::from("initial"));
+        state.documents.set(DocumentSet::new(initial_document));
+
+        for index in 1..count {
+            let document = create_document_state(
+                state.document_scope,
+                state.allocate_document_id(),
+                None,
+                format!("document {index}"),
+            );
+            state.push_document(document);
+        }
+
+        state
+    }
+
+    fn temp_markdown_file(prefix: &str, contents: &str) -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("{prefix}-{unique}.md"));
+        fs::write(&path, contents).expect("write temp file");
+        path
+    }
 }

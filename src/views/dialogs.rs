@@ -24,40 +24,101 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
             state.show_confirm.set(false);
         });
 
-    let save_button = {
+    let buttons = {
         let state = state.clone();
-        Button::new("Save").action(move || {
-            invoke_command(command_ids::FILE_SAVE, &state);
-        })
+        Stack::horizontal((
+            {
+                let action_state = state.clone();
+                let style_state = state.clone();
+                Button::new("Save")
+                    .action(move || {
+                        invoke_command(command_ids::FILE_SAVE, &action_state);
+                    })
+                    .style({
+                        move |s| {
+                            s.apply_if(
+                                matches!(
+                                    style_state.pending_action.get(),
+                                    Some(PendingAction::ShowMessage { .. }) | None
+                                ),
+                                |s| s.hide(),
+                            )
+                        }
+                    })
+            },
+            {
+                let action_state = state.clone();
+                let style_state = state.clone();
+                Button::new("Don't Save")
+                    .action(move || {
+                        if let Some(action) = action_state.pending_action.get_untracked() {
+                            finish_pending_action(action, &action_state);
+                        } else {
+                            action_state.show_confirm.set(false);
+                        }
+                    })
+                    .style({
+                        move |s| {
+                            s.apply_if(
+                                matches!(
+                                    style_state.pending_action.get(),
+                                    Some(PendingAction::ShowMessage { .. }) | None
+                                ),
+                                |s| s.hide(),
+                            )
+                        }
+                    })
+            },
+            {
+                let action_state = state.clone();
+                let style_state = state.clone();
+                Button::new("Cancel")
+                    .action(move || {
+                        action_state.pending_action.set(None);
+                        action_state.show_confirm.set(false);
+                    })
+                    .style({
+                        move |s| {
+                            s.apply_if(
+                                matches!(
+                                    style_state.pending_action.get(),
+                                    Some(PendingAction::ShowMessage { .. })
+                                ),
+                                |s| s.hide(),
+                            )
+                        }
+                    })
+            },
+            {
+                let action_state = state.clone();
+                let style_state = state.clone();
+                Button::new("OK")
+                    .action(move || {
+                        action_state.pending_action.set(None);
+                        action_state.show_confirm.set(false);
+                    })
+                    .style({
+                        move |s| {
+                            s.apply_if(
+                                !matches!(
+                                    style_state.pending_action.get(),
+                                    Some(PendingAction::ShowMessage { .. })
+                                ),
+                                |s| s.hide(),
+                            )
+                        }
+                    })
+            },
+        ))
+        .style(|s| s.col_gap(8.0))
     };
-
-    let dont_save_button = {
-        let state = state.clone();
-        Button::new("Don't Save").action(move || {
-            if let Some(action) = state.pending_action.get_untracked() {
-                finish_pending_action(action, &state);
-            } else {
-                state.show_confirm.set(false);
-            }
-        })
-    };
-
-    let cancel_button = {
-        let state = state.clone();
-        Button::new("Cancel").action(move || {
-            state.pending_action.set(None);
-            state.show_confirm.set(false);
-        })
-    };
-
-    let buttons =
-        Stack::horizontal((save_button, dont_save_button, cancel_button)).style(|s| s.col_gap(8.0));
 
     let title = {
         let state = state.clone();
         Label::derived(move || match state.pending_action.get() {
             Some(PendingAction::CloseDocument { .. }) => "Unsaved changes".to_string(),
             Some(PendingAction::CloseWindow { .. }) => "Unsaved changes".to_string(),
+            Some(PendingAction::ShowMessage { title, .. }) => title,
             None => "Unsaved changes".to_string(),
         })
     }
@@ -72,10 +133,17 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
             Some(PendingAction::CloseWindow { .. }) => {
                 "Save your changes before closing this window?".to_string()
             }
+            Some(PendingAction::ShowMessage { message, .. }) => message,
             None => "Save your changes before continuing?".to_string(),
         })
     }
-    .style(|s| s.color(Color::from_rgb8(82, 89, 102)));
+    .style(|s| {
+        s.width_full()
+            .max_width_full()
+            .min_width(0.0)
+            .text_wrap()
+            .color(Color::from_rgb8(82, 89, 102))
+    });
 
     let target_path = {
         let state = state.clone();
@@ -104,7 +172,14 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
                 .border(1.0)
                 .border_color(Color::from_rgb8(228, 232, 237))
                 .border_radius(8.0)
-                .apply_if(state.pending_action.get().is_none(), |s| s.hide())
+                .apply_if(
+                    !matches!(
+                        state.pending_action.get(),
+                        Some(PendingAction::CloseDocument { .. })
+                            | Some(PendingAction::CloseWindow { .. })
+                    ),
+                    |s| s.hide(),
+                )
         }
     });
 
