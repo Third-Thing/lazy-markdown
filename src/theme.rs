@@ -1,7 +1,7 @@
 use floem::{
     action::{current_theme, set_theme},
     peniko::Color,
-    prelude::SignalUpdate,
+    prelude::{SignalGet, SignalUpdate},
     style::{CursorColor, Style},
     views::editor::{
         CurrentLineColor, IndentGuideColor, PreeditUnderlineColor, SelectionColor,
@@ -19,6 +19,25 @@ pub(crate) enum ThemePreference {
     FollowOs,
     Light,
     Dark,
+}
+
+impl ThemePreference {
+    pub(crate) fn config_value(self) -> &'static str {
+        match self {
+            Self::FollowOs => "follow_os",
+            Self::Light => "light",
+            Self::Dark => "dark",
+        }
+    }
+
+    pub(crate) fn from_config_value(value: &str) -> Option<Self> {
+        match value {
+            "follow_os" => Some(Self::FollowOs),
+            "light" => Some(Self::Light),
+            "dark" => Some(Self::Dark),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -131,10 +150,10 @@ impl AppTheme {
     }
 }
 
-pub(crate) fn apply_theme_preference(state: &AppState, preference: ThemePreference) {
-    state.theme_preference.set(preference);
+use crate::config::store_app_config;
 
-    match preference {
+pub(crate) fn sync_theme_preference(state: &AppState) {
+    match state.theme_preference() {
         ThemePreference::Light => {
             state.window_theme.set(WindowTheme::Light);
             set_theme(Some(WindowTheme::Light));
@@ -150,6 +169,16 @@ pub(crate) fn apply_theme_preference(state: &AppState, preference: ThemePreferen
             }
         }
     }
+}
+
+pub(crate) fn apply_theme_preference(state: &AppState, preference: ThemePreference) {
+    state.set_theme_preference(preference);
+
+    if let Err(err) = store_app_config(state.app_config.get_untracked()) {
+        state.status_message.set(Some(err));
+    }
+
+    sync_theme_preference(state);
 }
 
 pub(crate) fn editor_theme_style(theme: AppTheme) -> Style {

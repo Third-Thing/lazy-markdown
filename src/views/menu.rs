@@ -159,7 +159,7 @@ fn theme_menu_entry(
     preference: ThemePreference,
     title: &'static str,
 ) -> AppMenuEntry {
-    let marker = if state.theme_preference.get() == preference {
+    let marker = if state.theme_preference() == preference {
         "[x]"
     } else {
         "[ ]"

@@ -1,5 +1,5 @@
 use std::{
-    env, fs,
+    fs,
     io::{ErrorKind, Write},
     path::{Path, PathBuf},
 };
@@ -7,9 +7,11 @@ use std::{
 use atomic_write_file::AtomicWriteFile;
 use floem::prelude::{SignalGet, SignalUpdate};
 
-use crate::state::{AppState, save_target_path};
+use crate::{
+    paths::app_data_file_path,
+    state::{AppState, save_target_path},
+};
 
-const APP_DIR_NAME: &str = "lazy-markdown";
 const RECENT_FILES_NAME: &str = "recent-files.txt";
 const MAX_RECENT_FILES: usize = 10;
 
@@ -68,47 +70,8 @@ fn same_path(left: &Path, right: &Path) -> bool {
     save_target_path(left) == save_target_path(right)
 }
 
-fn app_data_directory() -> Result<PathBuf, String> {
-    #[cfg(target_os = "windows")]
-    {
-        if let Some(base) = env::var_os("LOCALAPPDATA").or_else(|| env::var_os("APPDATA")) {
-            return Ok(PathBuf::from(base).join(APP_DIR_NAME));
-        }
-
-        return Err("Failed to resolve LOCALAPPDATA for recent files".to_string());
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let Some(home) = env::var_os("HOME") else {
-            return Err("Failed to resolve HOME for recent files".to_string());
-        };
-
-        return Ok(PathBuf::from(home)
-            .join("Library")
-            .join("Application Support")
-            .join(APP_DIR_NAME));
-    }
-
-    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-    {
-        if let Some(base) = env::var_os("XDG_DATA_HOME") {
-            return Ok(PathBuf::from(base).join(APP_DIR_NAME));
-        }
-
-        let Some(home) = env::var_os("HOME") else {
-            return Err("Failed to resolve HOME for recent files".to_string());
-        };
-
-        Ok(PathBuf::from(home)
-            .join(".local")
-            .join("share")
-            .join(APP_DIR_NAME))
-    }
-}
-
 fn recent_files_path() -> Result<PathBuf, String> {
-    Ok(app_data_directory()?.join(RECENT_FILES_NAME))
+    app_data_file_path(RECENT_FILES_NAME)
 }
 
 fn store_recent_files(recent_files: &RecentFiles) -> Result<(), String> {

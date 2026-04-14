@@ -13,6 +13,7 @@ use floem::{
 };
 
 use crate::{
+    config::AppConfig,
     recent_files::RecentFiles,
     theme::{AppTheme, ThemePreference},
 };
@@ -250,12 +251,12 @@ pub(crate) struct AppState {
     pub(crate) pending_action: RwSignal<Option<PendingAction>>,
     pub(crate) show_confirm: RwSignal<bool>,
     pub(crate) save_as_dialog_open: RwSignal<bool>,
-    pub(crate) theme_preference: RwSignal<ThemePreference>,
+    pub(crate) app_config: RwSignal<AppConfig>,
     pub(crate) window_theme: RwSignal<WindowTheme>,
 }
 
 impl AppState {
-    pub(crate) fn new(document_scope: Scope, recent_files: RecentFiles) -> Self {
+    pub(crate) fn new(document_scope: Scope, recent_files: RecentFiles, app_config: AppConfig) -> Self {
         Self {
             document_scope,
             documents: RwSignal::new(DocumentSet::empty()),
@@ -266,7 +267,7 @@ impl AppState {
             pending_action: RwSignal::new(None::<PendingAction>),
             show_confirm: RwSignal::new(false),
             save_as_dialog_open: RwSignal::new(false),
-            theme_preference: RwSignal::new(ThemePreference::FollowOs),
+            app_config: RwSignal::new(app_config),
             window_theme: RwSignal::new(WindowTheme::Light),
         }
     }
@@ -279,8 +280,21 @@ impl AppState {
         AppTheme::from_window_theme(self.resolved_window_theme())
     }
 
+    pub(crate) fn theme_preference(&self) -> ThemePreference {
+        self.app_config.get().theme_preference
+    }
+
+    pub(crate) fn theme_preference_untracked(&self) -> ThemePreference {
+        self.app_config.get_untracked().theme_preference
+    }
+
+    pub(crate) fn set_theme_preference(&self, theme_preference: ThemePreference) {
+        self.app_config
+            .update(|config| config.theme_preference = theme_preference);
+    }
+
     pub(crate) fn resolved_window_theme(&self) -> WindowTheme {
-        match self.theme_preference.get() {
+        match self.theme_preference() {
             ThemePreference::FollowOs => self.window_theme.get(),
             ThemePreference::Light => WindowTheme::Light,
             ThemePreference::Dark => WindowTheme::Dark,

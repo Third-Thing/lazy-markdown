@@ -3,7 +3,9 @@ use std::path::PathBuf;
 mod app_keys;
 mod bootstrap;
 mod commands;
+mod config;
 mod documents;
+mod paths;
 mod recent_files;
 mod shortcuts;
 mod state;
@@ -24,7 +26,7 @@ use floem::{
 };
 use recent_files::{RecentFiles, load_recent_files, record_recent_file};
 use state::{AppState, DocumentId, DocumentSet, PendingAction};
-use theme::ThemePreference;
+use theme::sync_theme_preference;
 use views::menu::{close_menu, is_menu_open};
 use views::{
     dialogs::confirm_overlay, editor::tab_content_view, menu::menu_bar_view, tabs::tab_strip_view,
@@ -35,10 +37,14 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
         Ok(recent_files) => (recent_files, None),
         Err(err) => (RecentFiles::default(), Some(err)),
     };
-    let state = AppState::new(Scope::current(), recent_files);
+    let state = AppState::new(Scope::current(), recent_files, bootstrap.app_config);
     state.window_theme.set(current_theme().unwrap_or(WindowTheme::Light));
+    sync_theme_preference(&state);
 
     if let Some(err) = recent_files_error {
+        state.status_message.set(Some(err));
+    }
+    if let Some(err) = bootstrap.app_config_error.clone() {
         state.status_message.set(Some(err));
     }
 
@@ -198,7 +204,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     .on_event_cont(listener::ThemeChanged, {
         let state = state.clone();
         move |_, theme| {
-            if state.theme_preference.get_untracked() == ThemePreference::FollowOs {
+            if state.theme_preference_untracked() == theme::ThemePreference::FollowOs {
                 state.window_theme.set(*theme);
             }
         }
