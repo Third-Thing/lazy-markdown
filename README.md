@@ -25,6 +25,7 @@ It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tr
 
 - folder view
 - font selector
+- theme selection / creation
 
 ### Beyond
 
@@ -35,7 +36,7 @@ It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tr
 - a secondary window for preview / rendering
 - search / replace
 - spell check
-- configuration file for style and hotkeys
+- configuration for hotkeys
 
 ## License
 
