@@ -15,15 +15,16 @@ use bootstrap::AppBootstrap;
 use documents::{activate_document, create_document_state, current_name, document_title_text};
 use floem::{
     Application,
+    action::current_theme,
     event::EventPropagation,
-    peniko::Color,
     prelude::*,
     reactive::Scope,
     views::{Label, Stack},
-    window::{WindowConfig, WindowId},
+    window::{Theme as WindowTheme, WindowConfig, WindowId},
 };
 use recent_files::{RecentFiles, load_recent_files, record_recent_file};
 use state::{AppState, DocumentId, DocumentSet, PendingAction};
+use theme::ThemePreference;
 use views::menu::{close_menu, is_menu_open};
 use views::{
     dialogs::confirm_overlay, editor::tab_content_view, menu::menu_bar_view, tabs::tab_strip_view,
@@ -35,6 +36,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
         Err(err) => (RecentFiles::default(), Some(err)),
     };
     let state = AppState::new(Scope::current(), recent_files);
+    state.window_theme.set(current_theme().unwrap_or(WindowTheme::Light));
 
     if let Some(err) = recent_files_error {
         state.status_message.set(Some(err));
@@ -71,11 +73,15 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
 
     let menu_bar = menu_bar_view(bootstrap.command_registry.clone(), state.clone());
 
-    let top_bar = menu_bar.style(|s| {
-        s.width_full()
-            .padding_horiz(10.0)
-            .padding_vert(6.0)
-            .background(Color::from_rgb8(236, 232, 221))
+    let top_bar = menu_bar.style({
+        let state = state.clone();
+        move |s| {
+            let theme = state.app_theme();
+            s.width_full()
+                .padding_horiz(10.0)
+                .padding_vert(6.0)
+                .background(theme.chrome_bg)
+        }
     });
 
     let status_strip = Stack::horizontal((
@@ -88,45 +94,59 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
                 document_title_text(&document)
             })
         }
-        .style(|s| {
-            s.font_size(12.0)
-                .font_bold()
-                .color(Color::from_rgb8(58, 62, 72))
+        .style({
+            let state = state.clone();
+            move |s| {
+                let theme = state.app_theme();
+                s.font_size(12.0).font_bold().color(theme.text)
+            }
         }),
         {
             let state = state.clone();
             Label::derived(move || state.status_message.get().unwrap_or_default())
         }
-        .style(|s| {
-            s.font_size(12.0)
-                .color(Color::from_rgb8(82, 89, 102))
-                .text_ellipsis()
-                .min_width(0.0)
-                .flex_grow(1.0)
-                .justify_end()
+        .style({
+            let state = state.clone();
+            move |s| {
+                let theme = state.app_theme();
+                s.font_size(12.0)
+                    .color(theme.text_muted)
+                    .text_ellipsis()
+                    .min_width(0.0)
+                    .flex_grow(1.0)
+                    .justify_end()
+            }
         }),
     ))
-    .style(|s| {
-        s.width_full()
-            .items_center()
-            .justify_between()
-            .col_gap(12.0)
-            .padding_horiz(12.0)
-            .padding_vert(8.0)
-            .background(Color::from_rgb8(243, 239, 230))
-            .border_top(1.0)
-            .border_color(Color::from_rgb8(220, 223, 227))
+    .style({
+        let state = state.clone();
+        move |s| {
+            let theme = state.app_theme();
+            s.width_full()
+                .items_center()
+                .justify_between()
+                .col_gap(12.0)
+                .padding_horiz(12.0)
+                .padding_vert(8.0)
+                .background(theme.status_bg)
+                .border_top(1.0)
+                .border_color(theme.border)
+        }
     });
 
     let tabs_strip = tab_strip_view(state.clone());
     let tabs_content = tab_content_view(state.clone());
 
     Stack::new((
-        Stack::vertical((top_bar, tabs_strip, tabs_content, status_strip)).style(|s| {
-            s.size_full()
-                .padding(10.0)
-                .row_gap(0.0)
-                .background(Color::from_rgb8(247, 243, 233))
+        Stack::vertical((top_bar, tabs_strip, tabs_content, status_strip)).style({
+            let state = state.clone();
+            move |s| {
+                let theme = state.app_theme();
+                s.size_full()
+                    .padding(10.0)
+                    .row_gap(0.0)
+                    .background(theme.panel_bg)
+            }
         }),
         confirm_overlay(state.clone()),
     ))
@@ -173,6 +193,14 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
                 remaining_documents: dirty_documents,
             }));
             state.show_confirm.set(true);
+        }
+    })
+    .on_event_cont(listener::ThemeChanged, {
+        let state = state.clone();
+        move |_, theme| {
+            if state.theme_preference.get_untracked() == ThemePreference::FollowOs {
+                state.window_theme.set(*theme);
+            }
         }
     })
 }

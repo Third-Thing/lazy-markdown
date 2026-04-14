@@ -2,7 +2,6 @@ use std::rc::Rc;
 
 use floem::AnyView;
 use floem::{
-    peniko::Color,
     prelude::{Key, KeyboardEvent, NamedKey, SignalGet, SignalUpdate, *},
     reactive::Effect,
     view::ViewId,
@@ -15,6 +14,7 @@ use crate::{
     documents::{current_name, focus_active_document, open_document_path},
     recent_files::clear_recent_files,
     state::{AppState, MenuUiState, TopLevelMenuId},
+    theme::{ThemePreference, apply_theme_preference},
 };
 
 #[derive(Clone)]
@@ -154,8 +154,40 @@ fn recent_menu_model(state: &AppState) -> AppMenuModel {
     AppMenuModel::new(TopLevelMenuId::Recent, "Recent", entries)
 }
 
+fn theme_menu_entry(
+    state: &AppState,
+    preference: ThemePreference,
+    title: &'static str,
+) -> AppMenuEntry {
+    let marker = if state.theme_preference.get() == preference {
+        "[x]"
+    } else {
+        "[ ]"
+    };
+    let title = format!("{marker} {title}");
+    AppMenuEntry::item(title, move |state| {
+        apply_theme_preference(state, preference);
+    })
+}
+
+fn theme_menu_model(state: &AppState) -> AppMenuModel {
+    AppMenuModel::new(
+        TopLevelMenuId::Theme,
+        "Theme",
+        vec![
+            theme_menu_entry(state, ThemePreference::Light, "Light"),
+            theme_menu_entry(state, ThemePreference::Dark, "Dark"),
+            theme_menu_entry(state, ThemePreference::FollowOs, "Follow OS"),
+        ],
+    )
+}
+
 fn app_menu_models(command_registry: &CommandRegistry, state: &AppState) -> Vec<AppMenuModel> {
-    vec![file_menu_model(command_registry), recent_menu_model(state)]
+    vec![
+        file_menu_model(command_registry),
+        recent_menu_model(state),
+        theme_menu_model(state),
+    ]
 }
 
 fn menu_model(
@@ -166,6 +198,7 @@ fn menu_model(
     match menu_id {
         TopLevelMenuId::File => file_menu_model(command_registry),
         TopLevelMenuId::Recent => recent_menu_model(state),
+        TopLevelMenuId::Theme => theme_menu_model(state),
     }
 }
 
@@ -198,10 +231,14 @@ fn select_menu_index(state: &AppState, menu_id: TopLevelMenuId, selected_index: 
 fn popup_row_view(menu_id: TopLevelMenuId, row: PopupRow, state: AppState) -> AnyView {
     match row.entry {
         AppMenuEntry::Separator => Empty::new()
-            .style(|s| {
-                s.height(1.0)
-                    .margin_vert(5.0)
-                    .background(Color::from_rgb8(222, 225, 229))
+            .style({
+                let state = state.clone();
+                move |s| {
+                    let theme = state.app_theme();
+                    s.height(1.0)
+                        .margin_vert(5.0)
+                        .background(theme.border)
+                }
             })
             .into_any(),
         AppMenuEntry::Item(item) => {
@@ -209,10 +246,12 @@ fn popup_row_view(menu_id: TopLevelMenuId, row: PopupRow, state: AppState) -> An
             let action = item.action.clone();
             let click_state = state;
             let hover_state = click_state.clone();
+            let style_state = click_state.clone();
 
             Label::new(item.title)
                 .style(move |s| {
-                    let menu_state = click_state.menu_state.get();
+                    let theme = style_state.app_theme();
+                    let menu_state = style_state.menu_state.get();
                     let selected = menu_state.open_menu == Some(menu_id)
                         && menu_state.selected_index == row.index;
                     s.width_full()
@@ -221,14 +260,14 @@ fn popup_row_view(menu_id: TopLevelMenuId, row: PopupRow, state: AppState) -> An
                         .padding_horiz(12.0)
                         .padding_vert(7.0)
                         .color(if enabled {
-                            Color::from_rgb8(44, 50, 63)
+                            theme.text
                         } else {
-                            Color::from_rgb8(148, 154, 166)
+                            theme.text_muted
                         })
                         .background(if selected && enabled {
-                            Color::from_rgb8(210, 215, 222)
+                            theme.menu_popup_selected_bg
                         } else {
-                            Color::from_rgb8(235, 237, 240)
+                            theme.menu_popup_bg
                         })
                 })
                 .on_event_stop(listener::PointerEnter, move |_, _| {
@@ -271,6 +310,7 @@ fn popup_content_view(
         .style(|s| s.row_gap(2.0).width_full())
     })
     .style(move |s| {
+        let theme = popup_style_state.app_theme();
         let is_active = popup_style_state.menu_state.get().open_menu == Some(menu_model.id);
         let anchor_rect = anchor_id.get_visual_rect();
         let inset_left = anchor_rect.x0.round();
@@ -281,8 +321,8 @@ fn popup_content_view(
             .min_width(260.0)
             .padding(6.0)
             .border(1.0)
-            .border_color(Color::from_rgb8(206, 211, 218))
-            .background(Color::from_rgb8(235, 237, 240))
+            .border_color(theme.border)
+            .background(theme.menu_popup_bg)
             .z_index(200)
             .apply_if(!is_active, |s| s.hide())
     })
@@ -349,24 +389,26 @@ fn menu_button(
         anchor_id,
         Label::new(menu_model.title.clone())
             .style(move |s| {
+                let theme = state.app_theme();
                 let is_active = state.menu_state.get().open_menu == Some(menu_model.id);
                 s.selectable(false)
                     .padding_horiz(6.0)
                     .padding_vert(3.0)
                     .border(1.0)
                     .border_color(if is_active {
-                        Color::from_rgb8(162, 170, 182)
+                        theme.menu_button_border_active
                     } else {
-                        Color::from_rgb8(196, 199, 204)
+                        theme.menu_button_border
                     })
                     .border_radius(4.0)
                     .background(if is_active {
-                        Color::from_rgb8(226, 231, 238)
+                        theme.menu_button_bg_active
                     } else {
-                        Color::from_rgb8(248, 249, 250)
+                        theme.menu_button_bg
                     })
-                    .hover(|s| s.background(Color::from_rgb8(232, 236, 240)))
-                    .active(|s| s.background(Color::from_rgb8(218, 224, 230)))
+                    .color(theme.text)
+                    .hover(|s| s.background(theme.menu_button_bg_hover))
+                    .active(|s| s.background(theme.menu_button_bg_pressed))
             })
             .on_event_stop(listener::Click, move |_, _| {
                 toggle_menu(&button_state, menu_model.id, &button_registry);

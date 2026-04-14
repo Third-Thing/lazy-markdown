@@ -1,5 +1,4 @@
 use floem::{
-    peniko::{Color, color::palette},
     prelude::*,
     views::{Button, Empty, Label, Overlay, Stack},
 };
@@ -12,12 +11,15 @@ use crate::{
 
 pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
     let backdrop = Empty::new()
-        .style(|s| {
-            s.absolute()
-                .inset(0.0)
-                .background(palette::css::BLACK)
-                .opacity(0.25)
-                .z_index(1)
+        .style({
+            let state = state.clone();
+            move |s| {
+                let theme = state.app_theme();
+                s.absolute()
+                    .inset(0.0)
+                    .background(theme.dialog_scrim)
+                    .z_index(1)
+            }
         })
         .on_event_cont(listener::Click, move |_, _| {
             state.pending_action.set(None);
@@ -138,11 +140,14 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
         })
     }
     .style(|s| {
-        s.width_full()
-            .max_width_full()
-            .min_width(0.0)
-            .text_wrap()
-            .color(Color::from_rgb8(82, 89, 102))
+        s.width_full().max_width_full().min_width(0.0).text_wrap()
+    });
+    let message = message.style({
+        let state = state.clone();
+        move |s| {
+            let theme = state.app_theme();
+            s.color(theme.text_muted)
+        }
     });
 
     let target_path = {
@@ -162,15 +167,16 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
     .style({
         let state = state.clone();
         move |s| {
+            let theme = state.app_theme();
             s.width_full()
                 .max_width_full()
                 .padding(10.0)
                 .font_size(12.0)
                 .text_wrap()
-                .color(Color::from_rgb8(59, 70, 91))
-                .background(Color::from_rgb8(244, 246, 250))
+                .color(theme.text)
+                .background(theme.dialog_path_bg)
                 .border(1.0)
-                .border_color(Color::from_rgb8(228, 232, 237))
+                .border_color(theme.dialog_path_border)
                 .border_radius(8.0)
                 .apply_if(
                     !matches!(
@@ -183,18 +189,23 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
         }
     });
 
-    let dialog = Stack::vertical((title, message, target_path, buttons)).style(|s| {
-        s.absolute()
-            .inset_left(40.0)
-            .inset_top(40.0)
-            .width(420.0)
-            .padding(16.0)
-            .row_gap(12.0)
-            .border(1.0)
-            .border_radius(12.0)
-            .border_color(Color::from_rgb8(224, 228, 233))
-            .background(palette::css::WHITE)
-            .z_index(10)
+    let dialog = Stack::vertical((title, message, target_path, buttons)).style({
+        let state = state.clone();
+        move |s| {
+            let theme = state.app_theme();
+            s.absolute()
+                .inset_left(40.0)
+                .inset_top(40.0)
+                .width(420.0)
+                .padding(16.0)
+                .row_gap(12.0)
+                .border(1.0)
+                .border_radius(12.0)
+                .border_color(theme.border)
+                .background(theme.dialog_bg)
+                .color(theme.text)
+                .z_index(10)
+        }
     });
 
     Overlay::new({

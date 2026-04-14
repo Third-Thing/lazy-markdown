@@ -1,5 +1,4 @@
 use floem::{
-    peniko::Color,
     prelude::*,
     reactive::Effect,
     views::{
@@ -17,7 +16,7 @@ fn document_editor_view(document: DocumentState, state: AppState) -> impl IntoVi
     let editor_sig = RwSignal::new(document.editor.clone());
     let document_id = document.id();
     let focus_document = document.clone();
-    let focus_state = state;
+    let focus_state = state.clone();
 
     Effect::new(move |_| {
         let is_active = focus_state.documents.get().active_document_id() == Some(document_id);
@@ -28,13 +27,17 @@ fn document_editor_view(document: DocumentState, state: AppState) -> impl IntoVi
         }
     });
 
-    editor_container_view(editor_sig, |_| true, default_key_handler(editor_sig)).style(|s| {
-        s.apply(editor_theme_style())
-            .width_full()
-            .min_size(0, 0)
-            .flex_grow(1.0)
-            .border(1.0)
-            .border_color(Color::from_rgb8(220, 223, 227))
+    editor_container_view(editor_sig, |_| true, default_key_handler(editor_sig)).style({
+        let state = state.clone();
+        move |s| {
+            let theme = state.app_theme();
+            s.apply(editor_theme_style(theme))
+                .width_full()
+                .min_size(0, 0)
+                .flex_grow(1.0)
+                .border(1.0)
+                .border_color(theme.border)
+        }
     })
 }
 

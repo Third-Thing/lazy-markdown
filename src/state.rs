@@ -8,10 +8,14 @@ use floem::{
     prelude::{RwSignal, SignalGet, SignalUpdate},
     reactive::Scope,
     view::ViewId,
+    window::Theme as WindowTheme,
     views::editor::Editor,
 };
 
-use crate::recent_files::RecentFiles;
+use crate::{
+    recent_files::RecentFiles,
+    theme::{AppTheme, ThemePreference},
+};
 
 #[derive(Clone)]
 pub(crate) enum PendingAction {
@@ -32,9 +36,14 @@ pub(crate) enum PendingAction {
 pub(crate) enum TopLevelMenuId {
     File,
     Recent,
+    Theme,
 }
 
-const MENU_ORDER: &[TopLevelMenuId] = &[TopLevelMenuId::File, TopLevelMenuId::Recent];
+const MENU_ORDER: &[TopLevelMenuId] = &[
+    TopLevelMenuId::File,
+    TopLevelMenuId::Recent,
+    TopLevelMenuId::Theme,
+];
 
 impl TopLevelMenuId {
     fn order_index(self) -> usize {
@@ -63,6 +72,7 @@ pub(crate) struct MenuUiState {
 struct MenuPopupIds {
     file: Option<ViewId>,
     recent: Option<ViewId>,
+    theme: Option<ViewId>,
 }
 
 impl MenuPopupIds {
@@ -70,6 +80,7 @@ impl MenuPopupIds {
         match menu_id {
             TopLevelMenuId::File => self.file,
             TopLevelMenuId::Recent => self.recent,
+            TopLevelMenuId::Theme => self.theme,
         }
     }
 
@@ -77,6 +88,7 @@ impl MenuPopupIds {
         match menu_id {
             TopLevelMenuId::File => self.file = Some(popup_id),
             TopLevelMenuId::Recent => self.recent = Some(popup_id),
+            TopLevelMenuId::Theme => self.theme = Some(popup_id),
         }
     }
 }
@@ -238,6 +250,8 @@ pub(crate) struct AppState {
     pub(crate) pending_action: RwSignal<Option<PendingAction>>,
     pub(crate) show_confirm: RwSignal<bool>,
     pub(crate) save_as_dialog_open: RwSignal<bool>,
+    pub(crate) theme_preference: RwSignal<ThemePreference>,
+    pub(crate) window_theme: RwSignal<WindowTheme>,
 }
 
 impl AppState {
@@ -252,11 +266,25 @@ impl AppState {
             pending_action: RwSignal::new(None::<PendingAction>),
             show_confirm: RwSignal::new(false),
             save_as_dialog_open: RwSignal::new(false),
+            theme_preference: RwSignal::new(ThemePreference::FollowOs),
+            window_theme: RwSignal::new(WindowTheme::Light),
         }
     }
 
     pub(crate) fn active_document(&self) -> Option<DocumentState> {
         self.documents.get().active_document()
+    }
+
+    pub(crate) fn app_theme(&self) -> AppTheme {
+        AppTheme::from_window_theme(self.resolved_window_theme())
+    }
+
+    pub(crate) fn resolved_window_theme(&self) -> WindowTheme {
+        match self.theme_preference.get() {
+            ThemePreference::FollowOs => self.window_theme.get(),
+            ThemePreference::Light => WindowTheme::Light,
+            ThemePreference::Dark => WindowTheme::Dark,
+        }
     }
 
     pub(crate) fn documents(&self) -> Vec<DocumentState> {

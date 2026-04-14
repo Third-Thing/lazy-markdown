@@ -56,6 +56,7 @@ pub(crate) fn top_level_menu_shortcut(event: &KeyboardEvent) -> Option<TopLevelM
     match &event.key {
         Key::Character(key) if key.eq_ignore_ascii_case("f") => Some(TopLevelMenuId::File),
         Key::Character(key) if key.eq_ignore_ascii_case("r") => Some(TopLevelMenuId::Recent),
+        Key::Character(key) if key.eq_ignore_ascii_case("t") => Some(TopLevelMenuId::Theme),
         _ => None,
     }
 }
