@@ -1,4 +1,7 @@
-use floem::{prelude::*, views::{Button, Label, Stack, dyn_stack}};
+use floem::{
+    prelude::*,
+    views::{Button, Label, Stack, dyn_stack},
+};
 
 use crate::{
     documents::{activate_document, document_title_text, request_close_document},
@@ -11,14 +14,13 @@ fn tab_header_view(document: DocumentState, state: AppState) -> impl IntoView {
     let close_state = state.clone();
 
     Stack::horizontal((
-        Label::derived(move || document_title_text(&document))
-            .style({
-                let state = state.clone();
-                move |s| {
-                    let theme = state.app_theme();
-                    s.font_size(12.0).color(theme.text)
-                }
-            }),
+        Label::derived(move || document_title_text(&document)).style({
+            let state = state.clone();
+            move |s| {
+                let theme = state.app_theme();
+                s.font_size(12.0).color(theme.text)
+            }
+        }),
         Button::new("x")
             .action(move || request_close_document(&close_state, document_id))
             .style({

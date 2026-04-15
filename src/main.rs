@@ -5,6 +5,7 @@ mod bootstrap;
 mod commands;
 mod config;
 mod documents;
+mod editor_font;
 mod paths;
 mod recent_files;
 mod shortcuts;
@@ -29,7 +30,10 @@ use state::{AppState, DocumentId, DocumentSet, PendingAction};
 use theme::sync_theme_preference;
 use views::menu::{close_menu, is_menu_open};
 use views::{
-    dialogs::confirm_overlay, editor::tab_content_view, menu::menu_bar_view, tabs::tab_strip_view,
+    dialogs::confirm_overlay,
+    editor::tab_content_view,
+    menu::{font_selector_view, menu_bar_view},
+    tabs::tab_strip_view,
 };
 
 fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
@@ -37,8 +41,10 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
         Ok(recent_files) => (recent_files, None),
         Err(err) => (RecentFiles::default(), Some(err)),
     };
-    let state = AppState::new(Scope::current(), recent_files, bootstrap.app_config);
-    state.window_theme.set(current_theme().unwrap_or(WindowTheme::Light));
+    let state = AppState::new(Scope::current(), recent_files, bootstrap.app_config.clone());
+    state
+        .window_theme
+        .set(current_theme().unwrap_or(WindowTheme::Light));
     sync_theme_preference(&state);
 
     if let Some(err) = recent_files_error {
@@ -68,6 +74,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
         DocumentId::initial(),
         initial_path,
         initial_text,
+        state.editor_font_untracked(),
     );
     state.documents.set(DocumentSet::new(initial_document));
     if let Some(path) = state
@@ -78,12 +85,16 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     }
 
     let menu_bar = menu_bar_view(bootstrap.command_registry.clone(), state.clone());
+    let font_selector = font_selector_view(state.clone());
 
-    let top_bar = menu_bar.style({
+    let top_bar = Stack::horizontal((menu_bar, font_selector)).style({
         let state = state.clone();
         move |s| {
             let theme = state.app_theme();
             s.width_full()
+                .items_center()
+                .justify_between()
+                .col_gap(12.0)
                 .padding_horiz(10.0)
                 .padding_vert(6.0)
                 .background(theme.chrome_bg)

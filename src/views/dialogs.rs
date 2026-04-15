@@ -139,9 +139,7 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
             None => "Save your changes before continuing?".to_string(),
         })
     }
-    .style(|s| {
-        s.width_full().max_width_full().min_width(0.0).text_wrap()
-    });
+    .style(|s| s.width_full().max_width_full().min_width(0.0).text_wrap());
     let message = message.style({
         let state = state.clone();
         move |s| {

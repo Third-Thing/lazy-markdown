@@ -5,13 +5,18 @@ use floem::{
     prelude::{Key, KeyboardEvent, NamedKey, SignalGet, SignalUpdate, *},
     reactive::Effect,
     view::ViewId,
-    views::{Container, Empty, Label, Overlay, Stack, dyn_stack},
+    views::{
+        Container, Empty, Label, Overlay, Stack,
+        dropdown::{Dropdown, DropdownClass},
+        dyn_stack,
+    },
 };
 
 use crate::{
     app_keys::top_level_menu_shortcut,
     commands::{CommandRegistry, command_ids, command_title, invoke_command},
     documents::{current_name, focus_active_document, open_document_path},
+    editor_font::{apply_editor_font, available_editor_fonts, editor_font_label},
     recent_files::clear_recent_files,
     state::{AppState, MenuUiState, TopLevelMenuId},
     theme::{ThemePreference, apply_theme_preference},
@@ -235,9 +240,7 @@ fn popup_row_view(menu_id: TopLevelMenuId, row: PopupRow, state: AppState) -> An
                 let state = state.clone();
                 move |s| {
                     let theme = state.app_theme();
-                    s.height(1.0)
-                        .margin_vert(5.0)
-                        .background(theme.border)
+                    s.height(1.0).margin_vert(5.0).background(theme.border)
                 }
             })
             .into_any(),
@@ -548,6 +551,71 @@ pub(crate) fn menu_bar_view(command_registry: CommandRegistry, state: AppState) 
     .on_event_stop(listener::Click, move |_, _| {})
 }
 
+pub(crate) fn font_selector_view(state: AppState) -> impl IntoView {
+    let font_options = available_editor_fonts();
+    let dropdown_state = state.clone();
+    let main_style_state = state.clone();
+    let list_style_state = state.clone();
+
+    Stack::horizontal((
+        Label::new("Font").style({
+            let state = state.clone();
+            move |s| {
+                let theme = state.app_theme();
+                s.font_size(13.0).color(theme.text_muted)
+            }
+        }),
+        Dropdown::custom(
+            move || dropdown_state.editor_font(),
+            {
+                let state = main_style_state.clone();
+                move |font: String| {
+                    Stack::horizontal((
+                        Label::new(editor_font_label(&font))
+                            .style(|s| s.font_size(13.0).flex_grow(1.0)),
+                        Label::new("v").style(|s| s.font_size(11.0)),
+                    ))
+                    .style({
+                        let state = state.clone();
+                        move |s| {
+                            let theme = state.app_theme();
+                            s.width_full()
+                                .min_width(160.0)
+                                .items_center()
+                                .justify_between()
+                                .padding_horiz(10.0)
+                                .padding_vert(6.0)
+                                .border_radius(4.0)
+                                .background(theme.menu_button_bg)
+                                .color(theme.text)
+                        }
+                    })
+                    .into_any()
+                }
+            },
+            font_options,
+            move |font: &String| {
+                Label::new(editor_font_label(font))
+                    .style({
+                        let state = list_style_state.clone();
+                        move |s| {
+                            let theme = state.app_theme();
+                            s.width_full()
+                                .padding_horiz(10.0)
+                                .padding_vert(6.0)
+                                .font_size(13.0)
+                                .color(theme.text)
+                        }
+                    })
+                    .into_any()
+            },
+        )
+        .on_accept(move |font| apply_editor_font(&state, font))
+        .style(|s| s.class(DropdownClass, |s| s.padding(0).border(0))),
+    ))
+    .style(|s| s.items_center().col_gap(8.0))
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -572,6 +640,7 @@ mod tests {
     use crate::{
         app_keys::{KeyHandling, app_key_event_config, handle_app_key_down},
         bootstrap::AppBootstrap,
+        config::AppConfig,
         documents::create_document_state,
         recent_files::RecentFiles,
         state::{AppState, DocumentId, DocumentSet, TopLevelMenuId},
@@ -692,9 +761,14 @@ mod tests {
 
     fn test_state(recent_files: RecentFiles) -> AppState {
         let scope = Scope::new();
-        let state = AppState::new(scope, recent_files);
-        let initial_document =
-            create_document_state(scope, DocumentId::initial(), None, String::from("initial"));
+        let state = AppState::new(scope, recent_files, AppConfig::default());
+        let initial_document = create_document_state(
+            scope,
+            DocumentId::initial(),
+            None,
+            String::from("initial"),
+            state.editor_font_untracked(),
+        );
         state.documents.set(DocumentSet::new(initial_document));
         state
     }

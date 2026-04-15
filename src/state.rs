@@ -8,12 +8,13 @@ use floem::{
     prelude::{RwSignal, SignalGet, SignalUpdate},
     reactive::Scope,
     view::ViewId,
-    window::Theme as WindowTheme,
     views::editor::Editor,
+    window::Theme as WindowTheme,
 };
 
 use crate::{
     config::AppConfig,
+    editor_font::normalize_editor_font,
     recent_files::RecentFiles,
     theme::{AppTheme, ThemePreference},
 };
@@ -256,7 +257,12 @@ pub(crate) struct AppState {
 }
 
 impl AppState {
-    pub(crate) fn new(document_scope: Scope, recent_files: RecentFiles, app_config: AppConfig) -> Self {
+    pub(crate) fn new(
+        document_scope: Scope,
+        recent_files: RecentFiles,
+        mut app_config: AppConfig,
+    ) -> Self {
+        app_config.editor_font = normalize_editor_font(&app_config.editor_font);
         Self {
             document_scope,
             documents: RwSignal::new(DocumentSet::empty()),
@@ -291,6 +297,19 @@ impl AppState {
     pub(crate) fn set_theme_preference(&self, theme_preference: ThemePreference) {
         self.app_config
             .update(|config| config.theme_preference = theme_preference);
+    }
+
+    pub(crate) fn editor_font(&self) -> String {
+        self.app_config.get().editor_font.clone()
+    }
+
+    pub(crate) fn editor_font_untracked(&self) -> String {
+        self.app_config.get_untracked().editor_font
+    }
+
+    pub(crate) fn set_editor_font(&self, editor_font: String) {
+        self.app_config
+            .update(|config| config.editor_font = editor_font);
     }
 
     pub(crate) fn resolved_window_theme(&self) -> WindowTheme {

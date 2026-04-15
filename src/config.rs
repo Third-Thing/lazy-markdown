@@ -5,19 +5,23 @@ use std::{
 
 use atomic_write_file::AtomicWriteFile;
 
-use crate::{paths::app_config_file_path, theme::ThemePreference};
+use crate::{
+    editor_font::default_editor_font, paths::app_config_file_path, theme::ThemePreference,
+};
 
 const CONFIG_FILE_NAME: &str = "config.toml";
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AppConfig {
     pub(crate) theme_preference: ThemePreference,
+    pub(crate) editor_font: String,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             theme_preference: ThemePreference::FollowOs,
+            editor_font: default_editor_font(),
         }
     }
 }
@@ -46,6 +50,12 @@ impl AppConfig {
                     };
                     config.theme_preference = theme_preference;
                 }
+                "editor_font" => {
+                    if value.is_empty() {
+                        return Err("Invalid editor_font value: empty string".to_string());
+                    };
+                    config.editor_font = value.to_string();
+                }
                 _ => {}
             }
         }
@@ -53,10 +63,11 @@ impl AppConfig {
         Ok(config)
     }
 
-    fn encode(self) -> String {
+    fn encode(&self) -> String {
         format!(
-            "# lazy-markdown user configuration\ntheme = \"{}\"\n",
-            self.theme_preference.config_value()
+            "# lazy-markdown user configuration\ntheme = \"{}\"\neditor_font = \"{}\"\n",
+            self.theme_preference.config_value(),
+            self.editor_font
         )
     }
 }
@@ -103,4 +114,24 @@ pub(crate) fn store_app_config(config: AppConfig) -> Result<(), String> {
         .map_err(|err| format!("Failed to write {}: {}", path.display(), err.into_error()))?;
     file.commit()
         .map_err(|err| format!("Failed to write {}: {err}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::theme::ThemePreference;
+
+    use super::AppConfig;
+
+    #[test]
+    fn config_round_trip_keeps_editor_font() {
+        let config = AppConfig {
+            theme_preference: ThemePreference::Dark,
+            editor_font: "monospace".to_string(),
+        };
+
+        let encoded = config.encode();
+        let decoded = AppConfig::parse(&encoded).expect("parse config");
+
+        assert_eq!(decoded, config);
+    }
 }

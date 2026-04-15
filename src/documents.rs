@@ -10,15 +10,12 @@ use floem::{
     prelude::{SignalGet, SignalUpdate},
     reactive::Scope,
     save_as,
-    views::editor::{
-        Editor,
-        text::{Document, SimpleStyling, Styling},
-        text_document::TextDocument,
-    },
+    views::editor::{Editor, text::Document, text_document::TextDocument},
     window::WindowId,
 };
 
 use crate::{
+    editor_font::editor_styling,
     recent_files::{record_recent_file, remove_recent_file},
     state::{AppState, DocumentId, DocumentState, PendingAction, save_target_path},
 };
@@ -36,10 +33,11 @@ pub(crate) fn create_document_state(
     document_id: DocumentId,
     file_path: Option<PathBuf>,
     text: String,
+    editor_font: String,
 ) -> DocumentState {
     let file_path = scope.create_rw_signal(file_path);
     let doc: Rc<dyn Document> = Rc::new(TextDocument::new(scope, text));
-    let style: Rc<dyn Styling> = Rc::new(SimpleStyling::new());
+    let style = editor_styling(&editor_font);
     let editor = Editor::new(scope, doc, style, false);
     DocumentState::new(document_id, file_path, editor)
 }
@@ -129,7 +127,13 @@ pub(crate) fn focus_active_document(state: &AppState) {
 
 fn create_document(state: &AppState, file_path: Option<PathBuf>, text: String) -> DocumentState {
     let document_id = state.allocate_document_id();
-    create_document_state(state.document_scope, document_id, file_path, text)
+    create_document_state(
+        state.document_scope,
+        document_id,
+        file_path,
+        text,
+        state.editor_font_untracked(),
+    )
 }
 
 fn create_and_activate_document(
@@ -359,6 +363,7 @@ mod tests {
     };
 
     use crate::{
+        config::AppConfig,
         recent_files::RecentFiles,
         state::{AppState, DocumentId, DocumentSet, PendingAction},
     };
@@ -408,6 +413,7 @@ mod tests {
             state.allocate_document_id(),
             Some(target_path.clone()),
             String::from("already open"),
+            state.editor_font_untracked(),
         );
         let target_document_id = target_document.id();
 
@@ -430,9 +436,14 @@ mod tests {
 
     fn test_state_with_document_count(count: usize) -> AppState {
         let scope = Scope::new();
-        let state = AppState::new(scope, RecentFiles::default());
-        let initial_document =
-            create_document_state(scope, DocumentId::initial(), None, String::from("initial"));
+        let state = AppState::new(scope, RecentFiles::default(), AppConfig::default());
+        let initial_document = create_document_state(
+            scope,
+            DocumentId::initial(),
+            None,
+            String::from("initial"),
+            state.editor_font_untracked(),
+        );
         state.documents.set(DocumentSet::new(initial_document));
 
         for index in 1..count {
@@ -441,6 +452,7 @@ mod tests {
                 state.allocate_document_id(),
                 None,
                 format!("document {index}"),
+                state.editor_font_untracked(),
             );
             state.push_document(document);
         }
