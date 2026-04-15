@@ -1,97 +1,205 @@
 # Architecture
 
-`lazy-markdown` is a single Cargo crate with a small command-model layer and a Floem host in the same source tree.
+`lazy-markdown` is a single Cargo crate. The app keeps its command registry, document model, Floem window, and local persistence in one source tree.
 
-The command model stays separate at the module level so command descriptions remain independent from the UI code, while the host owns editor behavior, saving, dialogs, and UI state.
+The code is split by role at the module level:
 
-## How It Works
+- `src/bootstrap.rs` builds startup data that must exist before the window opens.
+- `src/commands.rs` defines command metadata and the built-in command list.
+- `src/app_keys.rs` and `src/shortcuts.rs` turn key events into either menu actions or command IDs.
+- `src/state.rs` and `src/documents.rs` own document state, tab state, save flow, and close flow.
+- `src/views/` contains Floem views for menus, tabs, the editor area, and modal dialogs.
+- `src/config.rs`, `src/recent_files.rs`, `src/theme.rs`, `src/editor_font.rs`, and `src/paths.rs` handle user settings, recent file history, look and feel, and per-platform storage paths.
+- `src/main.rs` wires those pieces together into one application window.
 
-The app host owns the window, the document set, editor state, file dialogs, saves, and status messages.
+## Runtime Shape
 
-The command model is the shared rulebook for commands. It defines command IDs, command titles, default shortcuts, and placement hints for UI surfaces such as a menu or command palette.
+The host is responsible for almost all runtime behavior:
 
-At startup, the host builds its command list:
+- window creation
+- top bar, tab strip, editor area, status strip, and confirm overlay
+- document creation, activation, and closing
+- open and save dialogs
+- atomic file writes
+- dirty tracking and close confirmation
+- recent file history
+- theme and editor font preferences
+- status messages
 
-1. It creates a module registry.
-2. It adds the built-in file and view commands.
-3. It starts the editor window with the command registry.
+The command layer is smaller. It gives the app stable command IDs, labels, default shortcuts, and placement hints. The host then uses those IDs from menus and keyboard handling.
 
-After startup, user actions go through commands. A menu item and a keyboard shortcut both ask the host to run the same command ID. For example, choosing Save and pressing the Save shortcut both run `file.save`.
+That boundary is useful but not fully detached yet. `CommandRegistry` is clean metadata, but `invoke_command` still lives in `src/commands.rs` and dispatches straight into `AppState`, document code, and font-size code. In practice, the app has a command metadata layer plus a host-owned command executor, not a fully separate command subsystem.
 
-When `file.save` runs, the host checks whether the active document already has a file path. If it does, the host writes that document's text to the path. If it does not, the host opens a Save As dialog first, then writes to the selected path.
+## Startup
 
-`file.new` creates a new tab with its own editor and document state. `file.open` opens the selected file in a new tab, or activates the existing tab if that path is already open.
+Startup happens in two steps.
 
-Saves are atomic. The app writes the editor text into a temporary file, then commits the temporary file over the destination path after the write succeeds. The editor text is written from rope chunks through a buffered writer, so saving does not first build one full `String` copy of the document.
+First, `AppBootstrap::load`:
 
-## Project Layout
+1. creates a `ModuleRegistry`
+2. registers the built-in commands
+3. loads `AppConfig`, falling back to defaults if the config file cannot be read or parsed
 
-- `src/commands.rs` defines command metadata and the command registry. It should stay independent from Floem where practical.
-- `src/state.rs` holds app and document state.
-- `src/documents.rs` owns document lifecycle and file read/write flows.
-- `src/shortcuts.rs` maps keypresses to commands.
-- `src/views/` contains Floem view code grouped by UI area.
-- `src/main.rs` handles startup and app composition.
+Second, `app_view` in `src/main.rs`:
 
-## Command Model
+1. loads the recent file list, again falling back to an empty list on error
+2. creates `AppState` with the current Floem scope, recent files, and config
+3. syncs the window theme from the saved theme preference
+4. opens the first CLI argument as the initial document if one was provided
+5. otherwise creates a blank untitled document
+6. records the opened path in recent files when the initial document came from disk
+7. builds the window view tree and attaches app-level event handlers
 
-`commands.rs` currently owns the contracts that command providers and the app share:
+Config and recent-file load failures are not fatal once the process has started. They are surfaced through the status message strip instead.
 
-- `CommandRegistry` stores command metadata by stable command ID.
-- `ModuleRegistry` groups command registration so future modules can register commands through one host-facing entry point.
+## Core State
 
-The built-in file commands currently live in `commands.rs`:
+There are three main state types.
+
+- `DocumentState` stores a stable `DocumentId`, an optional file path signal, and a Floem `Editor`.
+- `DocumentSet` stores the open tabs, the active document ID, and the next document ID to allocate.
+- `AppState` stores the document set plus window-level state such as menu state, recent files, pending actions, the confirm overlay flag, the Save As dialog guard, user config, theme state, and the shared scope used to create new editors.
+
+`DocumentSet` also owns a few cross-tab rules:
+
+- activate a tab by `DocumentId`
+- remove a tab and pick the next active tab
+- find an already-open document by path
+- collect dirty document IDs for window-close handling
+
+The path lookup normalizes paths through `save_target_path`, so the app can treat different spellings of the same file path as one open document.
+
+## Commands And Input
+
+The built-in commands are:
 
 - `file.new`
 - `file.open`
 - `file.save`
 - `file.save_as`
+- `view.zoom_in`
+- `view.zoom_out`
+- `view.zoom_reset`
 
-Each command has a stable ID, title, zero or more default shortcuts, and placement hints for UI surfaces such as menu and palette.
+Each command has:
 
-Shortcuts can match either the logical key value, such as `s`, or the physical key code, such as `Equal` or `Digit0`. Physical codes are useful for standard shortcuts like zoom where the same keyboard position should work across layouts and shifted variants.
+- a stable ID
+- a title
+- zero or more default shortcuts
+- placement hints such as `Menu` or `Palette`
 
-## Host
+Keyboard handling works in two layers.
 
-The host owns UI state and user interaction:
+`src/app_keys.rs` handles app-wide key capture. It first checks for top-level menu shortcuts:
 
-- Floem views and styles.
-- File open and save dialogs.
-- Document set state, including per-tab editor and file path data.
-- Dirty and pristine document updates.
-- Pending close-tab and close-window flows.
-- Status messages.
-- Shortcut translation.
-- Command dispatch.
-- Atomic saving.
+- `Alt+F` opens or closes the File menu
+- `Alt+R` opens or closes the Recent menu
+- `Alt+T` opens or closes the Theme menu
 
-Commands are the shared entry point for UI actions. The menu and keyboard handler both call `invoke_command` with a command ID, so `file.save` and `file.save_as` are not separate UI-only code paths.
+If a menu is open, arrow keys, Enter, and Escape are routed to menu navigation. If no menu is open, `src/shortcuts.rs` scans the command registry and matches the key event against command shortcuts.
 
-This keeps later UI surfaces, such as context menus or a command palette, able to use the same command IDs and metadata.
+Shortcuts can match either:
+
+- the logical key value, such as `s`
+- the physical key code, such as `Equal`, `Minus`, or `Digit0`
+
+The physical-code path is used for zoom shortcuts so standard key positions still work across keyboard layouts and shifted variants.
+
+## Menus And UI Composition
+
+The window view tree is assembled in `src/main.rs`:
+
+1. a top bar with the menu bar on the left and the editor font selector on the right
+2. a tab strip
+3. the active editor view
+4. a status strip
+5. a confirm overlay layered above the main content
+
+`src/views/menu.rs` builds three top-level menus:
+
+- File
+- Recent
+- Theme
+
+Only the File menu is built from command metadata today. The Recent and Theme menus are still host-owned view models. The font picker is also host-owned UI and does not go through commands.
+
+This means the registry already helps with command labels and shortcuts, but menu structure is still partly hard-coded in the view layer.
+
+## Document Flow
+
+`src/documents.rs` owns document lifecycle.
+
+`file.new` creates a fresh editor tab with no file path. `file.open` opens a Floem file dialog, reads the selected file into a new tab, and records that path in recent files. If the chosen path is already open, the app activates the existing tab instead of opening a duplicate.
+
+The host currently enforces a hard cap of five open tabs. When the user tries to open a new file or create a new tab past that limit, the app shows a modal message instead of opening another document.
+
+Close behavior is also host-owned:
+
+- closing a dirty tab starts a confirm flow
+- closing the window walks through dirty documents one at a time
+- closing the last remaining tab does not leave the app empty; it resets that tab to a fresh untitled document
+
+Pending close work is tracked through `PendingAction`, which lets the same confirm overlay handle close-tab, close-window, and simple message dialogs.
 
 ## Save Flow
 
-Save behavior is intentionally not a separate module right now.
+Saving is handled directly in `src/documents.rs`.
 
-The app saves directly because atomic save is the safe default, the dependency is small, and the previous configurable save backend added more complexity than value.
+When `file.save` runs, the host checks whether the active document already has a file path:
 
-The save path is:
+- if it does, the app saves straight to that path
+- if it does not, the app opens a Save As dialog first
 
-1. Get the editor rope.
-2. Open an atomic temporary file for the destination path.
-3. Write rope chunks into a buffered writer.
-4. Flush and finish the buffered writer.
-5. Commit the atomic file.
-6. Mark the document pristine and update the current path/status message.
+The write path is:
 
-The app keeps ownership of all user-facing save behavior. That includes Save As dialogs, pending close/open flow, dirty/pristine updates, and status messages.
+1. resolve the destination path
+2. open an atomic temp file with `atomic-write-file`
+3. stream the editor rope into a buffered writer chunk by chunk
+4. flush the writer
+5. commit the temp file over the destination
+6. mark the document pristine
+7. update the document path, recent files, and status message
 
-Document-owned state is separate from app/window state. `DocumentState` stores a document ID, file path, and editor. `DocumentSet` stores the tabs, active document ID, and next document ID. `AppState` stores the document set plus window-level status, pending actions, confirmation overlay state, dialog flags, and the scope used to create new editors.
+The app writes rope chunks directly, so it does not build one large `String` copy just to save a document.
+
+## Persistence And Preferences
+
+The app stores two kinds of user data outside the project tree.
+
+- `config.toml` in the platform config directory
+- `recent-files.txt` in the platform data directory
+
+`src/paths.rs` picks the base directories per platform:
+
+- Windows uses `APPDATA` or `LOCALAPPDATA`
+- macOS uses `~/Library/Application Support`
+- Linux and other Unix-like targets use XDG paths when present, then fall back to `~/.config` and `~/.local/share`
+
+`AppConfig` currently stores:
+
+- theme preference
+- editor font family
+- editor font size
+
+Config values are normalized on load. Unknown font names fall back to the system default option, and font size is clamped to the supported range.
+
+Recent files are also normalized and deduplicated by resolved path. The list is capped at ten entries.
+
+Theme handling is split between saved preference and live OS state:
+
+- `Light` and `Dark` force a specific Floem theme
+- `FollowOs` listens for Floem theme changes and keeps the app in sync with the window system theme
+
+The app saves config on window exit. Recent files are persisted immediately when the list changes. Both use atomic writes.
 
 ## Current Limits
 
-Menu command order is still host-owned through fixed command IDs. The registry can filter by placement, but the command metadata does not yet include ordering or grouping.
+The architecture is still intentionally small, but a few limits are clear in the current code.
 
-Before fully generating the menu from the registry, add explicit metadata for order and groups so the UI is stable and intentional.
+- The command registry knows about placement hints, but there is no command palette or context menu yet. `Palette` is future-facing metadata right now.
+- Menu grouping and order are still host-owned in `src/views/menu.rs` and `src/state.rs`, so the registry is not yet rich enough to generate the full menu bar on its own.
+- Command execution is still tied to `AppState` and host modules, so the command layer is not yet a clean standalone boundary.
+- Theme changes and editor font family changes are host-owned actions rather than registry-backed commands.
+- The tab limit is a fixed constant in document code rather than a user setting.
 
-The future service boundary for out-of-process tools should be added after the native command model settles. Good candidates are linting, project search, and document analysis. Save and deep editor behavior should remain native host code unless there is a clear reason to move them elsewhere.
+If the app grows further, the next useful split is likely richer command metadata and a cleaner boundary between command description and command execution. Save flow, close confirmation, and deep editor behavior still fit best in the host because they are tightly tied to UI state and document state.
