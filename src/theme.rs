@@ -1,7 +1,7 @@
 use floem::{
     action::{current_theme, set_theme},
     peniko::Color,
-    prelude::{SignalGet, SignalUpdate},
+    prelude::SignalUpdate,
     style::{CursorColor, Style},
     views::editor::{
         CurrentLineColor, IndentGuideColor, PreeditUnderlineColor, SelectionColor,
@@ -150,8 +150,6 @@ impl AppTheme {
     }
 }
 
-use crate::config::store_app_config;
-
 pub(crate) fn sync_theme_preference(state: &AppState) {
     match state.theme_preference() {
         ThemePreference::Light => {
@@ -173,11 +171,6 @@ pub(crate) fn sync_theme_preference(state: &AppState) {
 
 pub(crate) fn apply_theme_preference(state: &AppState, preference: ThemePreference) {
     state.set_theme_preference(preference);
-
-    if let Err(err) = store_app_config(state.app_config.get_untracked()) {
-        state.status_message.set(Some(err));
-    }
-
     sync_theme_preference(state);
 }
 

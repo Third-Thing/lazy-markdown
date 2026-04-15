@@ -13,7 +13,7 @@ The command model is the shared rulebook for commands. It defines command IDs, c
 At startup, the host builds its command list:
 
 1. It creates a module registry.
-2. It adds the built-in file commands.
+2. It adds the built-in file and view commands.
 3. It starts the editor window with the command registry.
 
 After startup, user actions go through commands. A menu item and a keyboard shortcut both ask the host to run the same command ID. For example, choosing Save and pressing the Save shortcut both run `file.save`.
@@ -47,7 +47,9 @@ The built-in file commands currently live in `commands.rs`:
 - `file.save`
 - `file.save_as`
 
-Each command has a stable ID, title, optional default shortcut, and placement hints for UI surfaces such as menu and palette.
+Each command has a stable ID, title, zero or more default shortcuts, and placement hints for UI surfaces such as menu and palette.
+
+Shortcuts can match either the logical key value, such as `s`, or the physical key code, such as `Equal` or `Digit0`. Physical codes are useful for standard shortcuts like zoom where the same keyboard position should work across layouts and shifted variants.
 
 ## Host
 

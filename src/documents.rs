@@ -34,10 +34,11 @@ pub(crate) fn create_document_state(
     file_path: Option<PathBuf>,
     text: String,
     editor_font: String,
+    editor_font_size: usize,
 ) -> DocumentState {
     let file_path = scope.create_rw_signal(file_path);
     let doc: Rc<dyn Document> = Rc::new(TextDocument::new(scope, text));
-    let style = editor_styling(&editor_font);
+    let style = editor_styling(&editor_font, editor_font_size);
     let editor = Editor::new(scope, doc, style, false);
     DocumentState::new(document_id, file_path, editor)
 }
@@ -133,6 +134,7 @@ fn create_document(state: &AppState, file_path: Option<PathBuf>, text: String) -
         file_path,
         text,
         state.editor_font_untracked(),
+        state.editor_font_size_untracked(),
     )
 }
 
@@ -262,6 +264,9 @@ fn advance_window_close(
         }));
         state.show_confirm.set(true);
     } else {
+        if let Err(err) = state.store_app_config() {
+            eprintln!("Failed to save settings on exit: {err}");
+        }
         state.pending_action.set(None);
         state.show_confirm.set(false);
         close_window(window_id);
@@ -414,6 +419,7 @@ mod tests {
             Some(target_path.clone()),
             String::from("already open"),
             state.editor_font_untracked(),
+            state.editor_font_size_untracked(),
         );
         let target_document_id = target_document.id();
 
@@ -443,6 +449,7 @@ mod tests {
             None,
             String::from("initial"),
             state.editor_font_untracked(),
+            state.editor_font_size_untracked(),
         );
         state.documents.set(DocumentSet::new(initial_document));
 
@@ -453,6 +460,7 @@ mod tests {
                 None,
                 format!("document {index}"),
                 state.editor_font_untracked(),
+                state.editor_font_size_untracked(),
             );
             state.push_document(document);
         }

@@ -10,3 +10,4 @@ repository = "https://github.com/Third-Thing/lazy-markdown"
 [dependencies]
 floem = { git = "https://github.com/Third-Thing/floem.git", branch = "dirty-tracking-and-stale-cursor-crash-fix" }
 atomic-write-file = { version = "0.3.0", features = ["unnamed-tmpfile"] }
+keyboard-types = "0.8.3"

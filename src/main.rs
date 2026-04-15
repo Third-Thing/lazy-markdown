@@ -75,6 +75,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
         initial_path,
         initial_text,
         state.editor_font_untracked(),
+        state.editor_font_size_untracked(),
     );
     state.documents.set(DocumentSet::new(initial_document));
     if let Some(path) = state
@@ -200,16 +201,20 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
         let state = state.clone();
         move |cx, _| {
             let dirty_documents = state.dirty_document_ids_untracked();
-            let Some(first_dirty_document) = dirty_documents.first().copied() else {
+            if let Some(first_dirty_document) = dirty_documents.first().copied() {
+                cx.prevent_default();
+                activate_document(&state, first_dirty_document);
+                state.pending_action.set(Some(PendingAction::CloseWindow {
+                    window_id,
+                    remaining_documents: dirty_documents,
+                }));
+                state.show_confirm.set(true);
                 return;
-            };
-            cx.prevent_default();
-            activate_document(&state, first_dirty_document);
-            state.pending_action.set(Some(PendingAction::CloseWindow {
-                window_id,
-                remaining_documents: dirty_documents,
-            }));
-            state.show_confirm.set(true);
+            }
+
+            if let Err(err) = state.store_app_config() {
+                eprintln!("Failed to save settings on exit: {err}");
+            }
         }
     })
     .on_event_cont(listener::ThemeChanged, {

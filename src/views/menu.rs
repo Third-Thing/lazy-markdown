@@ -556,6 +556,7 @@ pub(crate) fn font_selector_view(state: AppState) -> impl IntoView {
     let dropdown_state = state.clone();
     let main_style_state = state.clone();
     let list_style_state = state.clone();
+    let size_state = state.clone();
 
     Stack::horizontal((
         Label::new("Font").style({
@@ -563,6 +564,18 @@ pub(crate) fn font_selector_view(state: AppState) -> impl IntoView {
             move |s| {
                 let theme = state.app_theme();
                 s.font_size(13.0).color(theme.text_muted)
+            }
+        }),
+        Label::derived(move || format!("{}px", size_state.editor_font_size())).style({
+            let state = state.clone();
+            move |s| {
+                let theme = state.app_theme();
+                s.font_size(12.0)
+                    .padding_horiz(8.0)
+                    .padding_vert(6.0)
+                    .border_radius(4.0)
+                    .background(theme.menu_button_bg)
+                    .color(theme.text_muted)
             }
         }),
         Dropdown::custom(
@@ -642,6 +655,7 @@ mod tests {
         bootstrap::AppBootstrap,
         config::AppConfig,
         documents::create_document_state,
+        editor_font::default_editor_font_size,
         recent_files::RecentFiles,
         state::{AppState, DocumentId, DocumentSet, TopLevelMenuId},
     };
@@ -759,6 +773,47 @@ mod tests {
         assert_eq!(child_keydowns.get_untracked(), 0);
     }
 
+    #[test]
+    fn shell_zoom_shortcuts_change_editor_font_size() {
+        let root = TestRoot::new();
+        let bootstrap = AppBootstrap::load().expect("bootstrap");
+        let state = test_state(RecentFiles::default());
+        let focus_id = ViewId::new();
+        let mut harness = menu_harness(root, state.clone(), bootstrap, focus_id);
+
+        harness.rebuild();
+        focus_id.request_focus();
+        harness.process_update_no_paint();
+        assert!(harness.is_focused(focus_id));
+
+        dispatch_key_and_flush(
+            &mut harness,
+            control_shift_character_event("+", Code::Equal),
+        );
+        assert_eq!(
+            state.editor_font_size_untracked(),
+            default_editor_font_size() + 1
+        );
+
+        dispatch_key_and_flush(&mut harness, control_character_event("-", Code::Minus));
+        assert_eq!(
+            state.editor_font_size_untracked(),
+            default_editor_font_size()
+        );
+
+        dispatch_key_and_flush(&mut harness, control_character_event("+", Code::NumpadAdd));
+        assert_eq!(
+            state.editor_font_size_untracked(),
+            default_editor_font_size() + 1
+        );
+
+        dispatch_key_and_flush(&mut harness, control_character_event("0", Code::Digit0));
+        assert_eq!(
+            state.editor_font_size_untracked(),
+            default_editor_font_size()
+        );
+    }
+
     fn test_state(recent_files: RecentFiles) -> AppState {
         let scope = Scope::new();
         let state = AppState::new(scope, recent_files, AppConfig::default());
@@ -768,6 +823,7 @@ mod tests {
             None,
             String::from("initial"),
             state.editor_font_untracked(),
+            state.editor_font_size_untracked(),
         );
         state.documents.set(DocumentSet::new(initial_document));
         state
@@ -856,6 +912,26 @@ mod tests {
             key: Key::Character(key.into()),
             code,
             modifiers: Modifiers::ALT,
+            ..Default::default()
+        }
+    }
+
+    fn control_character_event(key: &'static str, code: Code) -> KeyboardEvent {
+        KeyboardEvent {
+            state: KeyState::Down,
+            key: Key::Character(key.into()),
+            code,
+            modifiers: Modifiers::CONTROL,
+            ..Default::default()
+        }
+    }
+
+    fn control_shift_character_event(key: &'static str, code: Code) -> KeyboardEvent {
+        KeyboardEvent {
+            state: KeyState::Down,
+            key: Key::Character(key.into()),
+            code,
+            modifiers: Modifiers::CONTROL | Modifiers::SHIFT,
             ..Default::default()
         }
     }

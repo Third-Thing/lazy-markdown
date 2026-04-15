@@ -6,7 +6,9 @@ use std::{
 use atomic_write_file::AtomicWriteFile;
 
 use crate::{
-    editor_font::default_editor_font, paths::app_config_file_path, theme::ThemePreference,
+    editor_font::{default_editor_font, default_editor_font_size, normalize_editor_font_size},
+    paths::app_config_file_path,
+    theme::ThemePreference,
 };
 
 const CONFIG_FILE_NAME: &str = "config.toml";
@@ -15,6 +17,7 @@ const CONFIG_FILE_NAME: &str = "config.toml";
 pub(crate) struct AppConfig {
     pub(crate) theme_preference: ThemePreference,
     pub(crate) editor_font: String,
+    pub(crate) editor_font_size: usize,
 }
 
 impl Default for AppConfig {
@@ -22,6 +25,7 @@ impl Default for AppConfig {
         Self {
             theme_preference: ThemePreference::FollowOs,
             editor_font: default_editor_font(),
+            editor_font_size: default_editor_font_size(),
         }
     }
 }
@@ -56,6 +60,12 @@ impl AppConfig {
                     };
                     config.editor_font = value.to_string();
                 }
+                "editor_font_size" => {
+                    let requested_size = value.parse::<usize>().map_err(|err| {
+                        format!("Invalid editor_font_size value `{value}`: {err}")
+                    })?;
+                    config.editor_font_size = normalize_editor_font_size(requested_size);
+                }
                 _ => {}
             }
         }
@@ -65,9 +75,10 @@ impl AppConfig {
 
     fn encode(&self) -> String {
         format!(
-            "# lazy-markdown user configuration\ntheme = \"{}\"\neditor_font = \"{}\"\n",
+            "# lazy-markdown user configuration\ntheme = \"{}\"\neditor_font = \"{}\"\neditor_font_size = {}\n",
             self.theme_preference.config_value(),
-            self.editor_font
+            self.editor_font,
+            self.editor_font_size
         )
     }
 }
@@ -127,6 +138,7 @@ mod tests {
         let config = AppConfig {
             theme_preference: ThemePreference::Dark,
             editor_font: "monospace".to_string(),
+            editor_font_size: 19,
         };
 
         let encoded = config.encode();

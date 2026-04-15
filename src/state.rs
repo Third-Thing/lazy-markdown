@@ -13,8 +13,8 @@ use floem::{
 };
 
 use crate::{
-    config::AppConfig,
-    editor_font::normalize_editor_font,
+    config::{AppConfig, store_app_config},
+    editor_font::{normalize_editor_font, normalize_editor_font_size},
     recent_files::RecentFiles,
     theme::{AppTheme, ThemePreference},
 };
@@ -263,6 +263,7 @@ impl AppState {
         mut app_config: AppConfig,
     ) -> Self {
         app_config.editor_font = normalize_editor_font(&app_config.editor_font);
+        app_config.editor_font_size = normalize_editor_font_size(app_config.editor_font_size);
         Self {
             document_scope,
             documents: RwSignal::new(DocumentSet::empty()),
@@ -310,6 +311,23 @@ impl AppState {
     pub(crate) fn set_editor_font(&self, editor_font: String) {
         self.app_config
             .update(|config| config.editor_font = editor_font);
+    }
+
+    pub(crate) fn editor_font_size(&self) -> usize {
+        self.app_config.get().editor_font_size
+    }
+
+    pub(crate) fn editor_font_size_untracked(&self) -> usize {
+        self.app_config.get_untracked().editor_font_size
+    }
+
+    pub(crate) fn set_editor_font_size(&self, editor_font_size: usize) {
+        self.app_config
+            .update(|config| config.editor_font_size = editor_font_size);
+    }
+
+    pub(crate) fn store_app_config(&self) -> Result<(), String> {
+        store_app_config(self.app_config.get_untracked())
     }
 
     pub(crate) fn resolved_window_theme(&self) -> WindowTheme {
