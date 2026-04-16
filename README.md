@@ -2,11 +2,15 @@
 
 Goal: An efficient, safe, modular markdown editor with all dependencies written in Rust.
 
+The basic principle for this project is that minor usability conveniences don't outweigh gross programmatic inefficiencies. For example, almost nothing will be triggered on every keystroke.
+
 ## Status
 
 This is currently a plain text tabbed editor, with no markdown functionality (peak laziness). The implementation strategy is to build a useful plain text editor before adding markdown features.
 
 It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tree/dirty-tracking-and-stale-cursor-crash-fix) for proper dirty state tracking and a few crash fixes, while waiting for the [PRs](https://github.com/lapce/floem/pulls) to get merged.
+
+This program is only tested on Linux/Wayland.
 
 ### Current Features
 

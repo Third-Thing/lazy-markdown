@@ -16,6 +16,7 @@ mod views;
 use app_keys::{KeyHandling, app_key_event_config, handle_app_key_down};
 use bootstrap::AppBootstrap;
 use documents::{activate_document, create_document_state, current_name, document_title_text};
+use editor_font::editor_font_label;
 use floem::{
     Application,
     action::current_theme,
@@ -30,10 +31,7 @@ use state::{AppState, DocumentId, DocumentSet, PendingAction};
 use theme::sync_theme_preference;
 use views::menu::{close_menu, is_menu_open};
 use views::{
-    dialogs::confirm_overlay,
-    editor::tab_content_view,
-    menu::{font_selector_view, menu_bar_view},
-    tabs::tab_strip_view,
+    dialogs::confirm_overlay, editor::tab_content_view, menu::menu_bar_view, tabs::tab_strip_view,
 };
 
 fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
@@ -86,16 +84,13 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
     }
 
     let menu_bar = menu_bar_view(bootstrap.command_registry.clone(), state.clone());
-    let font_selector = font_selector_view(state.clone());
 
-    let top_bar = Stack::horizontal((menu_bar, font_selector)).style({
+    let top_bar = Stack::horizontal((menu_bar,)).style({
         let state = state.clone();
         move |s| {
             let theme = state.app_theme();
             s.width_full()
                 .items_center()
-                .justify_between()
-                .col_gap(12.0)
                 .padding_horiz(10.0)
                 .padding_vert(6.0)
                 .background(theme.chrome_bg)
@@ -106,10 +101,11 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
         {
             let state = state.clone();
             Label::derived(move || {
-                let Some(document) = state.active_document() else {
-                    return current_name(None);
-                };
-                document_title_text(&document)
+                format!(
+                    "{} {}px",
+                    editor_font_label(&state.editor_font()),
+                    state.editor_font_size()
+                )
             })
         }
         .style({

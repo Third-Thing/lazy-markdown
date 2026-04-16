@@ -95,6 +95,7 @@ Keyboard handling works in two layers.
 - `Alt+F` opens or closes the File menu
 - `Alt+R` opens or closes the Recent menu
 - `Alt+T` opens or closes the Theme menu
+- `Alt+O` opens or closes the Font menu
 
 If a menu is open, arrow keys, Enter, and Escape are routed to menu navigation. If no menu is open, `src/shortcuts.rs` scans the command registry and matches the key event against command shortcuts.
 
@@ -109,19 +110,20 @@ The physical-code path is used for zoom shortcuts so standard key positions stil
 
 The window view tree is assembled in `src/main.rs`:
 
-1. a top bar with the menu bar on the left and the editor font selector on the right
+1. a top bar with the menu bar
 2. a tab strip
 3. the active editor view
 4. a status strip
 5. a confirm overlay layered above the main content
 
-`src/views/menu.rs` builds three top-level menus:
+`src/views/menu.rs` builds four top-level menus:
 
 - File
 - Recent
 - Theme
+- Font
 
-Only the File menu is built from command metadata today. The Recent and Theme menus are still host-owned view models. The font picker is also host-owned UI and does not go through commands.
+Only the File menu is built from command metadata today. The Recent, Theme, and Font menus are still host-owned view models.
 
 This means the registry already helps with command labels and shortcuts, but menu structure is still partly hard-coded in the view layer.
 

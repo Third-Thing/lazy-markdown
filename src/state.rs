@@ -39,12 +39,14 @@ pub(crate) enum TopLevelMenuId {
     File,
     Recent,
     Theme,
+    Font,
 }
 
 const MENU_ORDER: &[TopLevelMenuId] = &[
     TopLevelMenuId::File,
     TopLevelMenuId::Recent,
     TopLevelMenuId::Theme,
+    TopLevelMenuId::Font,
 ];
 
 impl TopLevelMenuId {
@@ -75,6 +77,7 @@ struct MenuPopupIds {
     file: Option<ViewId>,
     recent: Option<ViewId>,
     theme: Option<ViewId>,
+    font: Option<ViewId>,
 }
 
 impl MenuPopupIds {
@@ -83,6 +86,7 @@ impl MenuPopupIds {
             TopLevelMenuId::File => self.file,
             TopLevelMenuId::Recent => self.recent,
             TopLevelMenuId::Theme => self.theme,
+            TopLevelMenuId::Font => self.font,
         }
     }
 
@@ -91,6 +95,7 @@ impl MenuPopupIds {
             TopLevelMenuId::File => self.file = Some(popup_id),
             TopLevelMenuId::Recent => self.recent = Some(popup_id),
             TopLevelMenuId::Theme => self.theme = Some(popup_id),
+            TopLevelMenuId::Font => self.font = Some(popup_id),
         }
     }
 }

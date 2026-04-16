@@ -5,11 +5,7 @@ use floem::{
     prelude::{Key, KeyboardEvent, NamedKey, SignalGet, SignalUpdate, *},
     reactive::Effect,
     view::ViewId,
-    views::{
-        Container, Empty, Label, Overlay, Stack,
-        dropdown::{Dropdown, DropdownClass},
-        dyn_stack,
-    },
+    views::{Container, Empty, Label, Overlay, Stack, dyn_stack},
 };
 
 use crate::{
@@ -187,11 +183,33 @@ fn theme_menu_model(state: &AppState) -> AppMenuModel {
     )
 }
 
+fn font_menu_entry(state: &AppState, font_family: String) -> AppMenuEntry {
+    let marker = if state.editor_font() == font_family {
+        "[x]"
+    } else {
+        "[ ]"
+    };
+    let title = format!("{marker} {}", editor_font_label(&font_family));
+    AppMenuEntry::item(title, move |state| {
+        apply_editor_font(state, font_family.clone());
+    })
+}
+
+fn font_menu_model(state: &AppState) -> AppMenuModel {
+    let entries = available_editor_fonts()
+        .into_iter()
+        .map(|font_family| font_menu_entry(state, font_family))
+        .collect();
+
+    AppMenuModel::new(TopLevelMenuId::Font, "Font", entries)
+}
+
 fn app_menu_models(command_registry: &CommandRegistry, state: &AppState) -> Vec<AppMenuModel> {
     vec![
         file_menu_model(command_registry),
         recent_menu_model(state),
         theme_menu_model(state),
+        font_menu_model(state),
     ]
 }
 
@@ -204,6 +222,7 @@ fn menu_model(
         TopLevelMenuId::File => file_menu_model(command_registry),
         TopLevelMenuId::Recent => recent_menu_model(state),
         TopLevelMenuId::Theme => theme_menu_model(state),
+        TopLevelMenuId::Font => font_menu_model(state),
     }
 }
 
@@ -551,84 +570,6 @@ pub(crate) fn menu_bar_view(command_registry: CommandRegistry, state: AppState) 
     .on_event_stop(listener::Click, move |_, _| {})
 }
 
-pub(crate) fn font_selector_view(state: AppState) -> impl IntoView {
-    let font_options = available_editor_fonts();
-    let dropdown_state = state.clone();
-    let main_style_state = state.clone();
-    let list_style_state = state.clone();
-    let size_state = state.clone();
-
-    Stack::horizontal((
-        Label::new("Font").style({
-            let state = state.clone();
-            move |s| {
-                let theme = state.app_theme();
-                s.font_size(13.0).color(theme.text_muted)
-            }
-        }),
-        Label::derived(move || format!("{}px", size_state.editor_font_size())).style({
-            let state = state.clone();
-            move |s| {
-                let theme = state.app_theme();
-                s.font_size(12.0)
-                    .padding_horiz(8.0)
-                    .padding_vert(6.0)
-                    .border_radius(4.0)
-                    .background(theme.menu_button_bg)
-                    .color(theme.text_muted)
-            }
-        }),
-        Dropdown::custom(
-            move || dropdown_state.editor_font(),
-            {
-                let state = main_style_state.clone();
-                move |font: String| {
-                    Stack::horizontal((
-                        Label::new(editor_font_label(&font))
-                            .style(|s| s.font_size(13.0).flex_grow(1.0)),
-                        Label::new("v").style(|s| s.font_size(11.0)),
-                    ))
-                    .style({
-                        let state = state.clone();
-                        move |s| {
-                            let theme = state.app_theme();
-                            s.width_full()
-                                .min_width(160.0)
-                                .items_center()
-                                .justify_between()
-                                .padding_horiz(10.0)
-                                .padding_vert(6.0)
-                                .border_radius(4.0)
-                                .background(theme.menu_button_bg)
-                                .color(theme.text)
-                        }
-                    })
-                    .into_any()
-                }
-            },
-            font_options,
-            move |font: &String| {
-                Label::new(editor_font_label(font))
-                    .style({
-                        let state = list_style_state.clone();
-                        move |s| {
-                            let theme = state.app_theme();
-                            s.width_full()
-                                .padding_horiz(10.0)
-                                .padding_vert(6.0)
-                                .font_size(13.0)
-                                .color(theme.text)
-                        }
-                    })
-                    .into_any()
-            },
-        )
-        .on_accept(move |font| apply_editor_font(&state, font))
-        .style(|s| s.class(DropdownClass, |s| s.padding(0).border(0))),
-    ))
-    .style(|s| s.items_center().col_gap(8.0))
-}
-
 #[cfg(test)]
 mod tests {
     use std::{
@@ -655,7 +596,7 @@ mod tests {
         bootstrap::AppBootstrap,
         config::AppConfig,
         documents::create_document_state,
-        editor_font::default_editor_font_size,
+        editor_font::{MONOSPACE_FONT, default_editor_font_size},
         recent_files::RecentFiles,
         state::{AppState, DocumentId, DocumentSet, TopLevelMenuId},
     };
@@ -814,6 +755,38 @@ mod tests {
         );
     }
 
+    #[test]
+    fn font_menu_can_be_opened_and_apply_a_font() {
+        let root = TestRoot::new();
+        let bootstrap = AppBootstrap::load().expect("bootstrap");
+        let state = test_state(RecentFiles::default());
+        let focus_id = ViewId::new();
+        let mut harness = menu_harness(root, state.clone(), bootstrap.clone(), focus_id);
+
+        harness.rebuild();
+        focus_id.request_focus();
+        harness.process_update_no_paint();
+        assert!(harness.is_focused(focus_id));
+
+        dispatch_key_and_flush(&mut harness, alt_character_event("o"));
+        assert_eq!(
+            state.menu_state.get_untracked().open_menu,
+            Some(TopLevelMenuId::Font)
+        );
+        assert_eq!(state.menu_state.get_untracked().selected_index, 0);
+        let popup_id = state
+            .menu_popup_id(TopLevelMenuId::Font)
+            .expect("font popup id");
+        assert!(harness.is_focused(popup_id));
+
+        dispatch_key_and_flush(&mut harness, named_key_event(NamedKey::ArrowDown));
+        dispatch_key_and_flush(&mut harness, named_key_event(NamedKey::ArrowDown));
+        dispatch_key_and_flush(&mut harness, named_key_event(NamedKey::ArrowDown));
+        dispatch_key_and_flush(&mut harness, named_key_event(NamedKey::Enter));
+
+        assert_eq!(state.editor_font_untracked(), MONOSPACE_FONT);
+    }
+
     fn test_state(recent_files: RecentFiles) -> AppState {
         let scope = Scope::new();
         let state = AppState::new(scope, recent_files, AppConfig::default());
@@ -905,6 +878,7 @@ mod tests {
         let code = match key {
             "f" | "F" => Code::KeyF,
             "r" | "R" => Code::KeyR,
+            "o" | "O" => Code::KeyO,
             _ => panic!("unsupported character key in test"),
         };
         KeyboardEvent {
