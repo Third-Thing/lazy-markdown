@@ -3,11 +3,9 @@ use std::path::PathBuf;
 mod app_keys;
 mod bootstrap;
 mod commands;
-mod config;
 mod documents;
 mod editor_font;
-mod paths;
-mod recent_files;
+mod persistence;
 mod shortcuts;
 mod state;
 mod theme;
@@ -26,7 +24,7 @@ use floem::{
     views::{Label, Stack},
     window::{Theme as WindowTheme, WindowConfig, WindowId},
 };
-use recent_files::{RecentFiles, load_recent_files, record_recent_file};
+use persistence::recent_files::{RecentFiles, load_recent_files, record_recent_file};
 use state::{AppState, DocumentId, DocumentSet, PendingAction};
 use theme::sync_theme_preference;
 use views::menu::{close_menu, is_menu_open};

@@ -16,7 +16,7 @@ use floem::{
 
 use crate::{
     editor_font::editor_styling,
-    recent_files::{record_recent_file, remove_recent_file},
+    persistence::recent_files::{record_recent_file, remove_recent_file},
     state::{AppState, DocumentId, DocumentState, PendingAction, save_target_path},
 };
 
@@ -368,8 +368,7 @@ mod tests {
     };
 
     use crate::{
-        config::AppConfig,
-        recent_files::RecentFiles,
+        persistence::{config::AppConfig, recent_files::RecentFiles},
         state::{AppState, DocumentId, DocumentSet, PendingAction},
     };
 

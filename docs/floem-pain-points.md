@@ -163,23 +163,26 @@ Useful upstream improvement:
 - A supported way for app code to extend the active theme with custom color and spacing values.
 - Or a cleaner custom-element theme hook that updates with the same light, dark, and follow-OS flow.
 
-## 8. Dropdown popup height is not configurable enough for long option lists
+## 8. Dropdown is not good enough for a desktop-style font picker
 
 Affected flow:
 - font selector in [src/views/menu.rs](../src/views/menu.rs)
 
 What is awkward:
-- Floem's `Dropdown` already wraps its options in a scroll view.
+- Floem's `Dropdown` did not support keyboard navigation in the way a desktop font picker needs.
+- It also did not track pointer movement by updating the highlighted option as the mouse moved across the list.
 - Popup sizing and overlay positioning are still mostly internal to the widget.
 - App code does not get a clean public way to cap popup height or control the visible scroll area for large option lists.
 
 Current workaround:
-- Accept the current dropdown behavior unless the app is willing to replace the widget with a custom popup.
+- Replace the old dropdown-based font picker with the same app-owned menu system used for the rest of the menu bar.
 
 Cost:
-- Long option lists can end up visually clipped before they behave like a normal bounded scrolling popup.
-- The widget is close to useful for this case, but not configurable enough through the public API.
+- More app-owned menu code for something that should have been close to a built-in widget.
+- The old dropdown was not acceptable for keyboard-first use.
+- The old dropdown also gave weaker pointer feedback than a normal desktop menu.
 
 Useful upstream improvement:
+- Support keyboard navigation and hover-driven highlight updates in `Dropdown`.
 - Expose a supported way to configure dropdown popup sizing, especially max height.
 - Or expose the popup container and scroll styling hooks needed to make long dropdowns behave like normal desktop pickers.

@@ -13,9 +13,8 @@ use floem::{
 };
 
 use crate::{
-    config::{AppConfig, store_app_config},
+    persistence::{config::{AppConfig, store_app_config}, recent_files::RecentFiles},
     editor_font::{normalize_editor_font, normalize_editor_font_size},
-    recent_files::RecentFiles,
     theme::{AppTheme, ThemePreference},
 };
 

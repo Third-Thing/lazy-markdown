@@ -13,7 +13,7 @@ use crate::{
     commands::{CommandRegistry, command_ids, command_title, invoke_command},
     documents::{current_name, focus_active_document, open_document_path},
     editor_font::{apply_editor_font, available_editor_fonts, editor_font_label},
-    recent_files::clear_recent_files,
+    persistence::recent_files::clear_recent_files,
     state::{AppState, MenuUiState, TopLevelMenuId},
     theme::{ThemePreference, apply_theme_preference},
 };
@@ -594,10 +594,9 @@ mod tests {
     use crate::{
         app_keys::{KeyHandling, app_key_event_config, handle_app_key_down},
         bootstrap::AppBootstrap,
-        config::AppConfig,
+        persistence::{config::AppConfig, recent_files::RecentFiles},
         documents::create_document_state,
         editor_font::{MONOSPACE_FONT, default_editor_font_size},
-        recent_files::RecentFiles,
         state::{AppState, DocumentId, DocumentSet, TopLevelMenuId},
     };
 

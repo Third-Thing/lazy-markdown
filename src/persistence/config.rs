@@ -7,7 +7,7 @@ use atomic_write_file::AtomicWriteFile;
 
 use crate::{
     editor_font::{default_editor_font, default_editor_font_size, normalize_editor_font_size},
-    paths::app_config_file_path,
+    persistence::paths::app_config_file_path,
     theme::ThemePreference,
 };
 

@@ -8,7 +8,7 @@ use atomic_write_file::AtomicWriteFile;
 use floem::prelude::{SignalGet, SignalUpdate};
 
 use crate::{
-    paths::app_data_file_path,
+    persistence::paths::app_data_file_path,
     state::{AppState, save_target_path},
 };
 

@@ -1,6 +1,6 @@
 use crate::{
     commands::{CommandRegistry, ModuleRegistry, register_builtin_commands},
-    config::{AppConfig, load_app_config},
+    persistence::config::{AppConfig, load_app_config},
 };
 
 #[derive(Clone)]
