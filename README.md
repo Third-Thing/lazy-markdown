@@ -10,6 +10,8 @@ This is currently a plain text tabbed editor, with no markdown functionality (pe
 
 It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tree/dirty-tracking-and-stale-cursor-crash-fix) for proper dirty state tracking and a few crash fixes, while waiting for the [PRs](https://github.com/lapce/floem/pulls) to get merged.
 
+The repo also tracks concrete Floem friction found in real app code in [docs/floem-pain-points.md](docs/floem-pain-points.md).
+
 This program is only tested on Linux/Wayland.
 
 ### Current Features

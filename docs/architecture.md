@@ -205,3 +205,5 @@ The architecture is still intentionally small, but a few limits are clear in the
 - The tab limit is a fixed constant in document code rather than a user setting.
 
 If the app grows further, the next useful split is likely richer command metadata and a cleaner boundary between command description and command execution. Save flow, close confirmation, and deep editor behavior still fit best in the host because they are tightly tied to UI state and document state.
+
+For toolkit-specific rough edges found while building these flows, see [floem-pain-points.md](./floem-pain-points.md).
