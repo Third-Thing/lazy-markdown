@@ -98,9 +98,9 @@ fn theme_menu_entry(
     title: &'static str,
 ) -> AppMenuEntry {
     let marker = if state.theme_preference() == preference {
-        "[x]"
+        "✓"
     } else {
-        "[ ]"
+        "•"
     };
     let title = format!("{marker} {title}");
     AppMenuEntry::item(title, move |state| {
@@ -122,9 +122,9 @@ fn theme_menu_model(state: &AppState) -> AppMenuModel {
 
 fn font_menu_entry(state: &AppState, font_family: String) -> AppMenuEntry {
     let marker = if state.editor_font() == font_family {
-        "[x]"
+        "✓"
     } else {
-        "[ ]"
+        "•"
     };
     let title = format!("{marker} {}", editor_font_label(&font_family));
     AppMenuEntry::item(title, move |state| {
