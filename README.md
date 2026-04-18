@@ -1,12 +1,33 @@
 # lazy-markdown
 
-Goal: An efficient, safe, modular markdown editor with all dependencies written in Rust.
+Goal: An efficient, safe, modular plain text editor with markdown-aware structure tools, with all dependencies written in Rust.
 
 The basic principle for this project is that minor usability conveniences don't outweigh gross programmatic inefficiencies. For example, almost nothing will be triggered on every keystroke.
 
+## Scope
+
+`lazy-markdown` is a plain text editor first.
+
+The project aims to help people edit markdown source more effectively through structure-aware tools, not by maintaining a second rendered view of the document.
+
+That means the project is interested in features such as:
+
+- outline navigation
+- heading-aware movement and selection
+- markdown normalization
+- structural transforms
+- source cleanup and conversion helpers
+
+It is not interested in features such as:
+
+- split view
+- live preview
+- built-in rendered markdown views
+- always-on background work that duplicates what the source text already says
+
 ## Status
 
-This is currently a plain text tabbed editor, with no markdown functionality (peak laziness). The implementation strategy is to build a useful plain text editor before adding markdown features.
+This is currently a plain text tabbed editor. The implementation strategy is to build a robust plain text editor first, then add markdown-aware editing features that improve source editing directly.
 
 It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tree/dirty-tracking-and-stale-cursor-crash-fix) for proper dirty state tracking and a few crash fixes, while waiting for the [PRs](https://github.com/lapce/floem/pulls) to get merged.
 
@@ -36,14 +57,16 @@ This program is only tested on Linux/Wayland.
 
 ### Beyond
 
+- outline navigation
+- heading-aware document navigation
 - search / replace
 - spell check
 - configuration for hotkeys
-- lazy markdown parsing (manual trigger or debounce)
-- LSP / service API for iwe, quickmark, etc
-- configurable markdown normalization
+- structural markdown transforms
+- markdown normalization
 - convert pasted content to markdown
-- a secondary window for preview / rendering
+- optional markdown parsing for structure-aware commands
+- LSP / service API for iwe, quickmark, etc
 
 ## License
 
