@@ -12,7 +12,7 @@ use floem::{
     window::Theme as WindowTheme,
 };
 
-use crate::state::AppState;
+use crate::workspace::AppState;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ThemePreference {

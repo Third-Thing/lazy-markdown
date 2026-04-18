@@ -17,8 +17,9 @@ use floem::{
 use crate::{
     preferences::editor_font::editor_styling,
     persistence::recent_files::{record_recent_file, remove_recent_file},
-    state::{AppState, DocumentId, DocumentState, PendingAction, save_target_path},
 };
+
+use super::state::{AppState, DocumentId, DocumentState, PendingAction, save_target_path};
 
 const MAX_OPEN_TABS: usize = 5;
 
@@ -369,7 +370,7 @@ mod tests {
 
     use crate::{
         persistence::{config::AppConfig, recent_files::RecentFiles},
-        state::{AppState, DocumentId, DocumentSet, PendingAction},
+        workspace::{AppState, DocumentId, DocumentSet, PendingAction},
     };
 
     use super::{MAX_OPEN_TABS, create_document_state, create_new_tab, open_document_path};

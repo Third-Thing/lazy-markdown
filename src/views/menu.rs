@@ -11,10 +11,12 @@ use floem::{
 use crate::{
     app_keys::top_level_menu_shortcut,
     commands::{CommandRegistry, command_ids, command_title, invoke_command},
-    documents::{current_name, focus_active_document, open_document_path},
     persistence::recent_files::clear_recent_files,
     preferences::{editor_font::{apply_editor_font, available_editor_fonts, editor_font_label}, theme::{ThemePreference, apply_theme_preference}},
-    state::{AppState, MenuUiState, TopLevelMenuId},
+    workspace::{
+        AppState, MenuUiState, TopLevelMenuId, current_name, focus_active_document,
+        open_document_path,
+    },
 };
 
 #[derive(Clone)]
@@ -594,9 +596,8 @@ mod tests {
         app_keys::{KeyHandling, app_key_event_config, handle_app_key_down},
         bootstrap::AppBootstrap,
         persistence::{config::AppConfig, recent_files::RecentFiles},
-        documents::create_document_state,
         preferences::editor_font::{MONOSPACE_FONT, default_editor_font_size},
-        state::{AppState, DocumentId, DocumentSet, TopLevelMenuId},
+        workspace::{AppState, DocumentId, DocumentSet, TopLevelMenuId, create_document_state},
     };
 
     #[test]

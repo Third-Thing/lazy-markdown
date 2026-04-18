@@ -9,7 +9,7 @@ use floem::prelude::{SignalGet, SignalUpdate};
 
 use crate::{
     persistence::paths::app_data_file_path,
-    state::{AppState, save_target_path},
+    workspace::{AppState, save_target_path},
 };
 
 const RECENT_FILES_NAME: &str = "recent-files.txt";

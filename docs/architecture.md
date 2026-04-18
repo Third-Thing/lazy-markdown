@@ -28,9 +28,12 @@ The architecture is shaped by a few simple rules:
 The crate is split by feature and support role:
 
 - `src/main.rs` builds the window, top-level view tree, and app-level event hooks.
-- `src/state.rs` holds the core app state, document state, tab state, menu state, and pending modal actions.
-- `src/documents.rs` owns document lifecycle, file open/save flows, tab activation, and close flows.
-- `src/views/` contains the custom Floem views for menus, tabs, editor content, and dialogs.
+- `src/workspace/mod.rs` groups document, tab, editor-area, and workspace state code under one feature area.
+- `src/workspace/state.rs` holds the core app state, document state, tab state, menu state, and pending modal actions.
+- `src/workspace/documents.rs` owns document lifecycle, file open/save flows, tab activation, and close flows.
+- `src/workspace/editor_area.rs` contains the active editor-area view.
+- `src/workspace/tabs.rs` contains the tab strip UI.
+- `src/views/` currently contains the custom Floem views for menus and dialogs.
 - `src/app_keys.rs` and `src/shortcuts.rs` handle app-wide key routing and command shortcut matching.
 - `src/commands.rs` defines command metadata and built-in command dispatch used by menus and shortcuts.
 - `src/persistence/` holds config loading, recent-file storage, and per-platform storage paths.
@@ -175,13 +178,13 @@ The command registry helps the app avoid duplicating labels and shortcut definit
 
 ## Document and Save Flow
 
-`src/documents.rs` owns document lifecycle.
+`src/workspace/documents.rs` owns document lifecycle.
 
 `file.new` creates a fresh untitled tab. `file.open` opens a Floem file dialog, reads the selected file into a new tab, and records the path in recent files. If the selected path is already open, the app activates that existing tab instead of opening a duplicate.
 
 The app currently enforces a hard cap of five open tabs. If the user tries to open more, the app shows a modal message through the same confirm overlay system.
 
-Saving is also handled directly in `src/documents.rs`.
+Saving is also handled directly in `src/workspace/documents.rs`.
 
 When `file.save` runs:
 

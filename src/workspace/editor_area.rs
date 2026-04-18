@@ -7,10 +7,9 @@ use floem::{
     },
 };
 
-use crate::{
-    preferences::theme::editor_theme_style,
-    state::{AppState, DocumentState},
-};
+use crate::preferences::theme::editor_theme_style;
+
+use super::state::{AppState, DocumentState};
 
 fn document_editor_view(document: DocumentState, state: AppState) -> impl IntoView {
     let editor_sig = RwSignal::new(document.editor.clone());

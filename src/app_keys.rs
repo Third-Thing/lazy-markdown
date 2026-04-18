@@ -6,8 +6,8 @@ use floem::{
 use crate::{
     commands::{CommandRegistry, invoke_command},
     shortcuts::resolve_shortcut_command,
-    state::{AppState, TopLevelMenuId},
     views::menu::{close_menu, handle_open_menu_key_down, is_menu_open, open_menu},
+    workspace::{AppState, TopLevelMenuId},
 };
 
 pub(crate) enum KeyHandling {

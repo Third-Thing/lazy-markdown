@@ -12,7 +12,7 @@ The goal is to keep these notes concrete:
 ## 1. No clean public path to build a higher-level editor view from an existing `Editor`
 
 Affected flow:
-- tabbed editing in [src/views/editor.rs](../src/views/editor.rs)
+- tabbed editing in [src/workspace/editor_area.rs](../src/workspace/editor_area.rs)
 
 What is awkward:
 - Floem exposes both the low-level `Editor` type and higher-level editor helpers.
@@ -36,7 +36,7 @@ Useful upstream improvement:
 ## 2. Signal scope lifetime is easy to misuse for callback-created state
 
 Affected flow:
-- document creation in [src/documents.rs](../src/documents.rs)
+- document creation in [src/workspace/documents.rs](../src/workspace/documents.rs)
 
 What is awkward:
 - Per-document state created from callbacks can outlive the reactive scope the callback happens to be running in.
@@ -122,7 +122,7 @@ Useful upstream improvement:
 ## 6. Editor focus target is not immediately available when app state switches documents
 
 Affected flow:
-- tab activation and focus in [src/documents.rs](../src/documents.rs) and [src/views/editor.rs](../src/views/editor.rs)
+- tab activation and focus in [src/workspace/documents.rs](../src/workspace/documents.rs) and [src/workspace/editor_area.rs](../src/workspace/editor_area.rs)
 
 What is awkward:
 - The app can mark a document active immediately.
@@ -144,7 +144,7 @@ Useful upstream improvement:
 
 Affected flow:
 - app theme code in [src/preferences/theme.rs](../src/preferences/theme.rs)
-- custom chrome in [src/main.rs](../src/main.rs), [src/views/menu.rs](../src/views/menu.rs), [src/views/tabs.rs](../src/views/tabs.rs), and [src/views/dialogs.rs](../src/views/dialogs.rs)
+- custom chrome in [src/main.rs](../src/main.rs), [src/views/menu.rs](../src/views/menu.rs), [src/workspace/tabs.rs](../src/workspace/tabs.rs), and [src/views/dialogs.rs](../src/views/dialogs.rs)
 
 What is awkward:
 - Floem's built-in light and dark support works well for standard widgets and built-in classes.

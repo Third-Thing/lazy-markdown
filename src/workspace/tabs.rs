@@ -3,7 +3,7 @@ use floem::{
     views::{Button, Label, Stack, dyn_stack},
 };
 
-use crate::{
+use super::{
     documents::{activate_document, document_title_text, request_close_document},
     state::{AppState, DocumentState},
 };

@@ -6,7 +6,7 @@ use floem::{
     views::editor::text::{SimpleStyling, Styling},
 };
 
-use crate::state::AppState;
+use crate::workspace::AppState;
 
 pub(crate) const SYSTEM_DEFAULT_FONT: &str = "system_default";
 pub(crate) const SANS_SERIF_FONT: &str = "sans_serif";

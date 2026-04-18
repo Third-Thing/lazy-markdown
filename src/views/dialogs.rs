@@ -5,8 +5,7 @@ use floem::{
 
 use crate::{
     commands::{command_ids, invoke_command},
-    documents::finish_pending_action,
-    state::{AppState, PendingAction},
+    workspace::{AppState, PendingAction, finish_pending_action},
 };
 
 pub(crate) fn confirm_overlay(state: AppState) -> Overlay {

@@ -4,11 +4,10 @@ use floem::prelude::SignalUpdate;
 use keyboard_types::{Code, NamedKey};
 
 use crate::{
-    documents::{create_new_tab, request_open, request_save, request_save_as},
     preferences::editor_font::{
         decrease_editor_font_size, increase_editor_font_size, reset_editor_font_size,
     },
-    state::AppState,
+    workspace::{AppState, create_new_tab, request_open, request_save, request_save_as},
 };
 
 #[allow(dead_code)]
