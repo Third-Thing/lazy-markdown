@@ -7,7 +7,10 @@ use atomic_write_file::AtomicWriteFile;
 
 use crate::{
     persistence::paths::app_config_file_path,
-    preferences::{editor_font::{default_editor_font, default_editor_font_size, normalize_editor_font_size}, theme::ThemePreference},
+    preferences::{
+        editor_font::{default_editor_font, default_editor_font_size, normalize_editor_font_size},
+        theme::ThemePreference,
+    },
 };
 
 const CONFIG_FILE_NAME: &str = "config.toml";

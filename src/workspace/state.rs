@@ -13,8 +13,14 @@ use floem::{
 };
 
 use crate::{
-    persistence::{config::{AppConfig, store_app_config}, recent_files::RecentFiles},
-    preferences::{editor_font::{normalize_editor_font, normalize_editor_font_size}, theme::{AppTheme, ThemePreference}},
+    persistence::{
+        config::{AppConfig, store_app_config},
+        recent_files::RecentFiles,
+    },
+    preferences::{
+        editor_font::{normalize_editor_font, normalize_editor_font_size},
+        theme::{AppTheme, ThemePreference},
+    },
 };
 
 #[derive(Clone)]

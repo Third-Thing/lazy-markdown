@@ -1,15 +1,14 @@
 use std::path::PathBuf;
 
-mod app_keys;
 mod bootstrap;
 mod commands;
+mod menus;
 mod persistence;
 mod preferences;
 mod shortcuts;
 mod views;
 mod workspace;
 
-use app_keys::{KeyHandling, app_key_event_config, handle_app_key_down};
 use bootstrap::AppBootstrap;
 use floem::{
     Application,
@@ -20,10 +19,15 @@ use floem::{
     views::{Label, Stack},
     window::{Theme as WindowTheme, WindowConfig, WindowId},
 };
-use preferences::{editor_font::editor_font_label, theme::{self, sync_theme_preference}};
+use menus::{
+    KeyHandling, app_key_event_config, close_menu, handle_app_key_down, is_menu_open, menu_bar_view,
+};
 use persistence::recent_files::{RecentFiles, load_recent_files, record_recent_file};
-use views::menu::{close_menu, is_menu_open};
-use views::{dialogs::confirm_overlay, menu::menu_bar_view};
+use preferences::{
+    editor_font::editor_font_label,
+    theme::{self, sync_theme_preference},
+};
+use views::dialogs::confirm_overlay;
 use workspace::{
     AppState, DocumentId, DocumentSet, PendingAction, activate_document, create_document_state,
     current_name, document_title_text, tab_content_view, tab_strip_view,

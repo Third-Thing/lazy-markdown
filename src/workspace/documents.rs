@@ -15,8 +15,8 @@ use floem::{
 };
 
 use crate::{
-    preferences::editor_font::editor_styling,
     persistence::recent_files::{record_recent_file, remove_recent_file},
+    preferences::editor_font::editor_styling,
 };
 
 use super::state::{AppState, DocumentId, DocumentState, PendingAction, save_target_path};

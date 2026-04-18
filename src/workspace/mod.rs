@@ -10,7 +10,6 @@ pub(crate) use documents::{
 };
 pub(crate) use editor_area::tab_content_view;
 pub(crate) use state::{
-    AppState, DocumentId, DocumentSet, MenuUiState, PendingAction, TopLevelMenuId,
-    save_target_path,
+    AppState, DocumentId, DocumentSet, MenuUiState, PendingAction, TopLevelMenuId, save_target_path,
 };
 pub(crate) use tabs::tab_strip_view;

@@ -28,17 +28,21 @@ The architecture is shaped by a few simple rules:
 The crate is split by feature and support role:
 
 - `src/main.rs` builds the window, top-level view tree, and app-level event hooks.
+- `src/bootstrap.rs` loads startup data before the Floem window opens.
+- `src/commands.rs` defines command metadata and built-in command dispatch used by menus and shortcuts.
 - `src/workspace/mod.rs` groups document, tab, editor-area, and workspace state code under one feature area.
 - `src/workspace/state.rs` holds the core app state, document state, tab state, menu state, and pending modal actions.
 - `src/workspace/documents.rs` owns document lifecycle, file open/save flows, tab activation, and close flows.
 - `src/workspace/editor_area.rs` contains the active editor-area view.
 - `src/workspace/tabs.rs` contains the tab strip UI.
-- `src/views/` currently contains the custom Floem views for menus and dialogs.
-- `src/app_keys.rs` and `src/shortcuts.rs` handle app-wide key routing and command shortcut matching.
-- `src/commands.rs` defines command metadata and built-in command dispatch used by menus and shortcuts.
+- `src/menus/mod.rs` groups the app menu setup and re-exports the public menu entry points.
+- `src/menus/model.rs` holds menu item and menu model types that are shared by menu UI and menu key handling.
+- `src/menus/view.rs` contains the Floem menu bar and popup UI.
+- `src/menus/keys.rs` handles app-level menu capture, popup navigation keys, and menu activation.
+- `src/views/` currently contains dialog views.
+- `src/shortcuts.rs` handles command shortcut matching when the menu system does not consume the keypress.
 - `src/persistence/` holds config loading, recent-file storage, and per-platform storage paths.
 - `src/preferences/` holds app theme behavior and editor font preferences.
-- `src/bootstrap.rs` loads startup data before the Floem window opens.
 
 ## Runtime Shape
 
@@ -103,7 +107,7 @@ Several important workflows are deliberately handled in the view-and-state layer
 
 ### Menus and keyboard routing
 
-The menu system is app-owned UI built in `src/views/menu.rs`.
+The menu system is app-owned UI built under `src/menus/`.
 
 The app currently has four top-level menus:
 
@@ -114,11 +118,13 @@ The app currently has four top-level menus:
 
 Keyboard routing is split across:
 
-- `src/app_keys.rs` for app-level capture and top-level menu shortcuts
-- `src/views/menu.rs` for menu-specific arrow-key and Enter behavior once a menu popup has focus
+- `src/menus/keys.rs` for app-level capture, top-level menu shortcuts, and popup navigation keys
+- `src/menus/view.rs` for the Floem menu bar and popup surfaces
 - `src/shortcuts.rs` for command shortcut matching when normal app content has focus
 
 This split is part of the real Floem story of the app. Overlay behavior, focus, and routing details matter here, and the code keeps that visible rather than hiding it behind a generic event layer.
+
+The current `menus/` layout also keeps one likely future contribution path visible: the reusable parts are the menu model, popup behavior, and keyboard routing, while the actual menu contents are still app-owned. That keeps Linux-specific focus and keyboard behavior easy to inspect instead of burying it in a general wrapper.
 
 ### Tabs and editor focus
 
