@@ -247,3 +247,88 @@ pub(crate) fn command_title(
         .map(|command| command.title)
         .unwrap_or(command_id)
 }
+
+#[cfg(test)]
+mod tests {
+    use floem::{
+        headless::TestRoot,
+        prelude::{SignalGet, SignalUpdate},
+        reactive::Scope,
+    };
+
+    use crate::{
+        persistence::{config::AppConfig, recent_files::RecentFiles},
+        preferences::editor_font::default_editor_font_size,
+        workspace::{AppState, DocumentId, DocumentSet, create_document_state},
+    };
+
+    use super::{command_ids, run_command};
+
+    #[test]
+    fn file_new_command_creates_a_tab() {
+        let _root = TestRoot::new();
+        let state = test_state();
+
+        run_command(command_ids::FILE_NEW, &state);
+
+        assert_eq!(state.document_count_untracked(), 2);
+        assert_eq!(
+            state.status_message.get_untracked().as_deref(),
+            Some("Started a new document")
+        );
+    }
+
+    #[test]
+    fn zoom_commands_update_editor_font_size() {
+        let _root = TestRoot::new();
+        let state = test_state();
+
+        run_command(command_ids::VIEW_ZOOM_IN, &state);
+        assert_eq!(
+            state.editor_font_size_untracked(),
+            default_editor_font_size() + 1
+        );
+
+        run_command(command_ids::VIEW_ZOOM_OUT, &state);
+        assert_eq!(
+            state.editor_font_size_untracked(),
+            default_editor_font_size()
+        );
+
+        run_command(command_ids::VIEW_ZOOM_IN, &state);
+        run_command(command_ids::VIEW_ZOOM_RESET, &state);
+        assert_eq!(
+            state.editor_font_size_untracked(),
+            default_editor_font_size()
+        );
+    }
+
+    #[test]
+    fn save_command_reports_missing_active_document() {
+        let _root = TestRoot::new();
+        let scope = Scope::new();
+        let state = AppState::new(scope, RecentFiles::default(), AppConfig::default());
+
+        run_command(command_ids::FILE_SAVE, &state);
+
+        assert_eq!(
+            state.status_message.get_untracked().as_deref(),
+            Some("No active document")
+        );
+    }
+
+    fn test_state() -> AppState {
+        let scope = Scope::new();
+        let state = AppState::new(scope, RecentFiles::default(), AppConfig::default());
+        let initial_document = create_document_state(
+            scope,
+            DocumentId::initial(),
+            None,
+            String::from("initial"),
+            state.editor_font_untracked(),
+            state.editor_font_size_untracked(),
+        );
+        state.documents.set(DocumentSet::new(initial_document));
+        state
+    }
+}

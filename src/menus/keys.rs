@@ -202,6 +202,7 @@ mod tests {
         menus::{KeyHandling, app_key_event_config, handle_app_key_down, menu_bar_view},
         persistence::{config::AppConfig, recent_files::RecentFiles},
         preferences::editor_font::{MONOSPACE_FONT, default_editor_font_size},
+        preferences::theme::ThemePreference,
         workspace::{AppState, DocumentId, DocumentSet, TopLevelMenuId, create_document_state},
     };
 
@@ -393,6 +394,37 @@ mod tests {
         assert_eq!(state.editor_font_untracked(), MONOSPACE_FONT);
     }
 
+    #[test]
+    fn theme_menu_can_be_opened_and_apply_dark_theme() {
+        let root = TestRoot::new();
+        let bootstrap = AppBootstrap::load().expect("bootstrap");
+        let state = test_state(RecentFiles::default());
+        let focus_id = ViewId::new();
+        let mut harness = menu_harness(root, state.clone(), bootstrap.clone(), focus_id);
+
+        harness.rebuild();
+        focus_id.request_focus();
+        harness.process_update_no_paint();
+        assert!(harness.is_focused(focus_id));
+
+        dispatch_key_and_flush(&mut harness, alt_character_event("t"));
+        assert_eq!(
+            state.menu_state.get_untracked().open_menu,
+            Some(TopLevelMenuId::Theme)
+        );
+        assert_eq!(state.menu_state.get_untracked().selected_index, 0);
+        let popup_id = state
+            .menu_popup_id(TopLevelMenuId::Theme)
+            .expect("theme popup id");
+        assert!(harness.is_focused(popup_id));
+
+        dispatch_key_and_flush(&mut harness, named_key_event(NamedKey::ArrowDown));
+        dispatch_key_and_flush(&mut harness, named_key_event(NamedKey::Enter));
+
+        assert_eq!(state.theme_preference_untracked(), ThemePreference::Dark);
+        assert_eq!(state.resolved_window_theme(), floem::window::Theme::Dark);
+    }
+
     fn test_state(recent_files: RecentFiles) -> AppState {
         let scope = Scope::new();
         let state = AppState::new(scope, recent_files, AppConfig::default());
@@ -484,6 +516,7 @@ mod tests {
         let code = match key {
             "f" | "F" => Code::KeyF,
             "r" | "R" => Code::KeyR,
+            "t" | "T" => Code::KeyT,
             "o" | "O" => Code::KeyO,
             _ => panic!("unsupported character key in test"),
         };

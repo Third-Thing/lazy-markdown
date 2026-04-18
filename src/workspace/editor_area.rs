@@ -52,3 +52,81 @@ pub(crate) fn tab_content_view(state: AppState) -> impl IntoView {
     )
     .style(|s| s.width_full().min_size(0, 0).flex_grow(1.0))
 }
+
+#[cfg(test)]
+mod tests {
+    use floem::{
+        headless::{HeadlessHarness, TestRoot},
+        prelude::{SignalGet, SignalUpdate},
+        reactive::Scope,
+    };
+
+    use crate::{
+        persistence::{config::AppConfig, recent_files::RecentFiles},
+        workspace::{AppState, DocumentId, DocumentSet, activate_document, create_document_state},
+    };
+
+    use super::tab_content_view;
+
+    #[test]
+    fn tab_content_view_builds_editor_views_and_tracks_active_document() {
+        let root = TestRoot::new();
+        let state = test_state_with_two_documents();
+        let document_a = state
+            .document_by_id_untracked(DocumentId::initial())
+            .expect("document a");
+        let document_b = state
+            .documents()
+            .into_iter()
+            .find(|document| document.id() != DocumentId::initial())
+            .expect("document b");
+        let mut harness =
+            HeadlessHarness::new_with_size(root, tab_content_view(state.clone()), 920.0, 680.0);
+
+        harness.rebuild();
+
+        let editor_a_view_id = document_a
+            .editor
+            .editor_view_id
+            .get_untracked()
+            .expect("editor a view id");
+        let editor_b_view_id = document_b
+            .editor
+            .editor_view_id
+            .get_untracked()
+            .expect("editor b view id");
+        assert_ne!(editor_a_view_id, editor_b_view_id);
+        assert_eq!(state.active_index(), Some(0));
+
+        state.set_active_document(document_b.id());
+        harness.process_update_no_paint();
+
+        assert_eq!(state.active_index(), Some(1));
+    }
+
+    fn test_state_with_two_documents() -> AppState {
+        let scope = Scope::new();
+        let state = AppState::new(scope, RecentFiles::default(), AppConfig::default());
+        let initial_document = create_document_state(
+            scope,
+            DocumentId::initial(),
+            None,
+            String::from("first"),
+            state.editor_font_untracked(),
+            state.editor_font_size_untracked(),
+        );
+        state.documents.set(DocumentSet::new(initial_document));
+
+        let second_document = create_document_state(
+            state.document_scope,
+            state.allocate_document_id(),
+            None,
+            String::from("second"),
+            state.editor_font_untracked(),
+            state.editor_font_size_untracked(),
+        );
+        state.push_document(second_document);
+        activate_document(&state, DocumentId::initial());
+        state
+    }
+}

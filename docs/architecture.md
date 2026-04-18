@@ -46,6 +46,8 @@ The crate is split by feature and support role:
 - `src/persistence/` holds config loading, recent-file storage, and per-platform storage paths.
 - `src/preferences/` holds app theme behavior and editor font preferences.
 
+Feature modules also keep their own focused `#[cfg(test)]` coverage nearby. The current test layout favors headless interaction tests in the same modules as the menu, tab, document, command, and preference flows they exercise.
+
 ## Runtime Shape
 
 The app is built around one Floem window with a small set of app-owned surfaces:

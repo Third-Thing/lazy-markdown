@@ -360,6 +360,7 @@ mod tests {
         headless::TestRoot,
         prelude::{SignalGet, SignalUpdate},
         reactive::Scope,
+        views::editor::core::{cursor::CursorAffinity, editor::EditType, selection::Selection},
     };
 
     use crate::{
@@ -368,7 +369,10 @@ mod tests {
         workspace::{AppState, DocumentId, DocumentSet},
     };
 
-    use super::{MAX_OPEN_TABS, create_document_state, create_new_tab, open_document_path};
+    use super::{
+        MAX_OPEN_TABS, complete_dialog_action, create_document_state, create_new_tab,
+        open_document_path, request_close_document,
+    };
 
     #[test]
     fn create_new_tab_shows_popup_at_limit() {
@@ -432,6 +436,61 @@ mod tests {
         let _ = fs::remove_file(target_path);
     }
 
+    #[test]
+    fn requesting_close_on_dirty_document_opens_confirmation_dialog() {
+        let _root = TestRoot::new();
+        let state = test_state_with_document_count(2);
+        let document_id = DocumentId::initial();
+        let document = state
+            .document_by_id_untracked(document_id)
+            .expect("initial document");
+        make_document_dirty(&document);
+
+        request_close_document(&state, document_id);
+
+        assert!(matches!(
+            state.active_dialog_untracked(),
+            Some(ActiveDialog::ConfirmCloseDocument { document_id: id }) if id == document_id
+        ));
+        assert_eq!(
+            state.documents.get_untracked().active_document_id(),
+            Some(document_id)
+        );
+    }
+
+    #[test]
+    fn requesting_close_on_pristine_document_closes_immediately() {
+        let _root = TestRoot::new();
+        let state = test_state_with_document_count(2);
+        let document_id = DocumentId::initial();
+
+        request_close_document(&state, document_id);
+
+        assert!(state.document_by_id_untracked(document_id).is_none());
+        assert!(state.active_dialog_untracked().is_none());
+        assert_eq!(state.document_count_untracked(), 1);
+    }
+
+    #[test]
+    fn completing_dirty_close_dialog_closes_without_saving() {
+        let _root = TestRoot::new();
+        let state = test_state_with_document_count(2);
+        let document_id = DocumentId::initial();
+        let document = state
+            .document_by_id_untracked(document_id)
+            .expect("initial document");
+        make_document_dirty(&document);
+
+        request_close_document(&state, document_id);
+        let dialog = state.active_dialog_untracked().expect("close dialog");
+
+        complete_dialog_action(dialog, &state);
+
+        assert!(state.document_by_id_untracked(document_id).is_none());
+        assert!(state.active_dialog_untracked().is_none());
+        assert_eq!(state.document_count_untracked(), 1);
+    }
+
     fn test_state_with_document_count(count: usize) -> AppState {
         let scope = Scope::new();
         let state = AppState::new(scope, RecentFiles::default(), AppConfig::default());
@@ -468,5 +527,14 @@ mod tests {
         let path = std::env::temp_dir().join(format!("{prefix}-{unique}.md"));
         fs::write(&path, contents).expect("write temp file");
         path
+    }
+
+    fn make_document_dirty(document: &crate::workspace::state::DocumentState) {
+        document.editor.doc().edit_single(
+            Selection::caret(0, CursorAffinity::Forward),
+            "!",
+            EditType::InsertChars,
+        );
+        assert!(document.editor.doc().is_dirty());
     }
 }
