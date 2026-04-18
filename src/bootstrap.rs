@@ -1,5 +1,5 @@
 use crate::{
-    commands::{CommandRegistry, ModuleRegistry, register_builtin_commands},
+    commands::{CommandRegistry, register_builtin_commands},
     persistence::config::{AppConfig, load_app_config},
 };
 
@@ -12,15 +12,15 @@ pub(crate) struct AppBootstrap {
 
 impl AppBootstrap {
     pub(crate) fn load() -> Result<Self, String> {
-        let mut registry = ModuleRegistry::new();
-        register_builtin_commands(registry.commands_mut())?;
+        let mut command_registry = CommandRegistry::default();
+        register_builtin_commands(&mut command_registry)?;
         let (app_config, app_config_error) = match load_app_config() {
             Ok(app_config) => (app_config, None),
             Err(err) => (AppConfig::default(), Some(err)),
         };
 
         Ok(Self {
-            command_registry: registry.commands().clone(),
+            command_registry,
             app_config,
             app_config_error,
         })

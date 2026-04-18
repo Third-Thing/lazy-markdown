@@ -41,7 +41,7 @@ pub(crate) fn handle_app_key_down(
     }
 
     if let Some(command_id) = resolve_shortcut_command(command_registry, event) {
-        crate::commands::invoke_command(command_id, state);
+        crate::commands::run_command(command_id, state);
         return KeyHandling::Handled;
     }
 

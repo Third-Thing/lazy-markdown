@@ -4,7 +4,7 @@ use floem::{
 };
 
 use crate::{
-    commands::{command_ids, invoke_command},
+    commands::{command_ids, run_command},
     workspace::{AppState, complete_dialog_action},
 };
 
@@ -33,7 +33,7 @@ pub(crate) fn dialog_overlay(state: AppState) -> Overlay {
                 let style_state = state.clone();
                 Button::new("Save")
                     .action(move || {
-                        invoke_command(command_ids::FILE_SAVE, &action_state);
+                        run_command(command_ids::FILE_SAVE, &action_state);
                     })
                     .style(move |s| {
                         s.apply_if(

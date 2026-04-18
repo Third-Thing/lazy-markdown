@@ -14,7 +14,7 @@ use model::{AppMenuEntry, AppMenuModel, PopupRow};
 pub(crate) use view::menu_bar_view;
 
 use crate::{
-    commands::{CommandRegistry, command_ids, command_title, invoke_command},
+    commands::{CommandRegistry, command_ids, command_title, run_command},
     persistence::recent_files::clear_recent_files,
     preferences::{
         editor_font::{apply_editor_font, available_editor_fonts, editor_font_label},
@@ -50,7 +50,7 @@ fn command_menu_entry(
     command_id: &'static str,
 ) -> AppMenuEntry {
     let title = command_title(command_registry, command_id).to_string();
-    AppMenuEntry::item(title, move |state| invoke_command(command_id, state))
+    AppMenuEntry::item(title, move |state| run_command(command_id, state))
 }
 
 fn file_menu_model(command_registry: &CommandRegistry) -> AppMenuModel {

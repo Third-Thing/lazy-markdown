@@ -73,25 +73,6 @@ impl CommandRegistry {
     }
 }
 
-#[derive(Clone, Default)]
-pub struct ModuleRegistry {
-    commands: CommandRegistry,
-}
-
-impl ModuleRegistry {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn commands(&self) -> &CommandRegistry {
-        &self.commands
-    }
-
-    pub fn commands_mut(&mut self) -> &mut CommandRegistry {
-        &mut self.commands
-    }
-}
-
 pub mod command_ids {
     pub const FILE_NEW: &str = "file.new";
     pub const FILE_OPEN: &str = "file.open";
@@ -226,7 +207,7 @@ pub fn register_builtin_commands(registry: &mut CommandRegistry) -> Result<(), S
     Ok(())
 }
 
-pub(crate) fn invoke_command(command_id: &str, state: &AppState) {
+pub(crate) fn run_command(command_id: &str, state: &AppState) {
     match command_id {
         command_ids::FILE_NEW => create_new_tab(state),
         command_ids::FILE_OPEN => request_open(state.clone()),

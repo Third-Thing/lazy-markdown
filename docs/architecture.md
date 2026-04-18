@@ -163,7 +163,7 @@ That code now lives under `src/preferences/`:
 
 ## Commands
 
-Commands exist to support menus, shortcuts, and future command-oriented UI such as a palette. They are useful, but they are not the center of the architecture.
+Commands exist to support menus, shortcuts, and future command-oriented UI such as a palette. They are shared app metadata plus a small execution helper, not a separate subsystem.
 
 The built-in commands are:
 
@@ -182,7 +182,9 @@ Each command has:
 - default shortcuts
 - placement hints such as `Menu` or `Palette`
 
-The command registry helps the app avoid duplicating labels and shortcut definitions across menus and keyboard handling. Execution still stays close to the Floem app state and document flows, which is the right tradeoff for this repo's goals.
+The command registry helps the app avoid duplicating labels and shortcut definitions across menus and keyboard handling. `src/commands.rs` also includes the small `run_command` helper used by menus, shortcuts, and save-confirm dialog actions.
+
+That is intentionally narrow. The app does not have a command host layer or a plugin-style command pipeline. Command execution still stays close to the Floem app state and document flows, which is the right tradeoff for this repo's goals.
 
 ## Document and Save Flow
 
