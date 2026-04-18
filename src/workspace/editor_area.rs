@@ -55,13 +55,6 @@ fn editor_has_selection(document: &DocumentState) -> bool {
         .with_untracked(|cursor| !cursor.edit_selection(&doc.rope_text()).is_caret())
 }
 
-fn editor_has_active_selection(editor: &floem::views::editor::Editor) -> bool {
-    let doc = editor.doc();
-    editor
-        .cursor
-        .with_untracked(|cursor| !cursor.edit_selection(&doc.rope_text()).is_caret())
-}
-
 fn editor_can_paste() -> bool {
     Clipboard::get_contents().is_ok_and(|content| !content.is_empty())
 }
@@ -258,9 +251,7 @@ fn app_editor_content(
                         }
                         Some(PointerButton::Secondary) => {
                             let current_editor = editor.get_untracked();
-                            if !editor_has_active_selection(&current_editor) {
-                                move_caret_for_secondary_click(&current_editor, pointer_state);
-                            }
+                            move_caret_for_secondary_click(&current_editor, pointer_state);
                         }
                         _ => {}
                     }
@@ -453,21 +444,25 @@ pub(crate) fn tab_content_view(state: AppState) -> impl IntoView {
 mod tests {
     use floem::{
         headless::{HeadlessHarness, TestRoot},
-        prelude::{SignalGet, SignalUpdate},
+        prelude::{SignalGet, SignalUpdate, SignalWith},
         reactive::Scope,
         views::editor::core::cursor::CursorAffinity,
     };
 
     use crate::{
         persistence::{config::AppConfig, recent_files::RecentFiles},
-        workspace::{AppState, DocumentId, DocumentSet, activate_document, create_document_state},
+        workspace::state::DocumentState,
+        workspace::{
+            AppState, DocumentId, DocumentSet, activate_document, create_document_state,
+        },
     };
 
     use super::{
-        EditCommand, EditorCommand, editor_has_selection, run_editor_clipboard_command,
-        run_editor_command, tab_content_view,
+        EditCommand, EditorCommand, editor_has_selection, move_caret_for_secondary_click,
+        run_editor_clipboard_command, run_editor_command, tab_content_view,
     };
     use floem::views::editor::core::command::MultiSelectionCommand;
+    use floem::ui_events::pointer::PointerState;
 
     #[test]
     fn tab_content_view_builds_editor_views_and_tracks_active_document() {
@@ -543,6 +538,76 @@ mod tests {
         assert!(document.editor.doc().is_dirty());
     }
 
+    #[test]
+    fn secondary_click_outside_selection_moves_caret_to_click() {
+        let root = TestRoot::new();
+        let state = test_state_with_two_documents();
+        let document = state
+            .document_by_id_untracked(DocumentId::initial())
+            .expect("document");
+        let mut harness =
+            HeadlessHarness::new_with_size(root, tab_content_view(state.clone()), 920.0, 680.0);
+
+        harness.rebuild();
+
+        document.editor.cursor.update(|cursor| {
+            cursor.set_offset(0, CursorAffinity::Backward, false, false);
+            cursor.set_offset(5, CursorAffinity::Backward, true, false);
+        });
+
+        let pointer_state = pointer_state_for_offset(&document, 8);
+        move_caret_for_secondary_click(&document.editor, &pointer_state);
+
+        let doc = document.editor.doc();
+        let selection = document
+            .editor
+            .cursor
+            .with_untracked(|cursor| cursor.edit_selection(&doc.rope_text()));
+        assert!(selection.is_caret());
+        assert_eq!(selection.min_offset(), 8);
+    }
+
+    #[test]
+    fn secondary_click_inside_selection_keeps_selection() {
+        let root = TestRoot::new();
+        let state = test_state_with_two_documents();
+        let document = state
+            .document_by_id_untracked(DocumentId::initial())
+            .expect("document");
+        let mut harness =
+            HeadlessHarness::new_with_size(root, tab_content_view(state.clone()), 920.0, 680.0);
+
+        harness.rebuild();
+
+        document.editor.cursor.update(|cursor| {
+            cursor.set_offset(0, CursorAffinity::Backward, false, false);
+            cursor.set_offset(5, CursorAffinity::Backward, true, false);
+        });
+
+        let pointer_state = pointer_state_for_offset(&document, 3);
+        move_caret_for_secondary_click(&document.editor, &pointer_state);
+
+        let doc = document.editor.doc();
+        let selection = document
+            .editor
+            .cursor
+            .with_untracked(|cursor| cursor.edit_selection(&doc.rope_text()));
+        assert!(!selection.is_caret());
+        assert_eq!(selection.min_offset(), 0);
+        assert_eq!(selection.first().expect("selection").max(), 5);
+    }
+
+    fn pointer_state_for_offset(document: &DocumentState, offset: usize) -> PointerState {
+        let point = document
+            .editor
+            .line_point_of_offset(offset, CursorAffinity::Backward);
+        PointerState {
+            position: (point.x + 1.0, point.y).into(),
+            scale_factor: 1.0,
+            ..Default::default()
+        }
+    }
+
     fn test_state_with_two_documents() -> AppState {
         let scope = Scope::new();
         let state = AppState::new(scope, RecentFiles::default(), AppConfig::default());
@@ -550,7 +615,7 @@ mod tests {
             scope,
             DocumentId::initial(),
             None,
-            String::from("first"),
+            String::from("first line"),
             state.editor_font_untracked(),
             state.editor_font_size_untracked(),
         );

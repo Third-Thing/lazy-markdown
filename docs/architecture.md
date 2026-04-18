@@ -142,7 +142,7 @@ That split is deliberate. Floem's built-in Linux context menu path crashed under
 
 The editor-area code also keeps a small local copy of Floem's editor-content pointer wiring. That workaround is needed because Floem's stock editor handler currently checks whether the pointer device is primary instead of whether the pressed button is primary, which lets mouse right-clicks fall into the normal left-click selection path.
 
-When the editor already has a selection, the app keeps that selection on right-click so paste can replace it. If there is no selection, the app moves the caret to the clicked position first.
+When the editor already has a selection, the app keeps that selection on right-click only if the click lands inside that selection so paste can replace it. If the click lands outside the current selection, the app moves the caret to the clicked position first.
 
 The overlay anchor converts the editor-content local pointer position back into window coordinates before placing the menu. Floem delivers pointer locations in the local space of the receiving view, so app-owned overlays need that conversion to land at the actual cursor position.
 
