@@ -1,5 +1,6 @@
 pub(crate) mod documents;
 pub(crate) mod editor_area;
+pub(crate) mod frame;
 pub(crate) mod state;
 pub(crate) mod tabs;
 
@@ -9,6 +10,7 @@ pub(crate) use documents::{
     request_save_as,
 };
 pub(crate) use editor_area::tab_content_view;
+pub(crate) use frame::workspace_frame_view;
 pub(crate) use state::{
     AppState, DocumentId, DocumentSet, MenuUiState, TopLevelMenuId, save_target_path,
 };

@@ -17,20 +17,17 @@ use floem::{
     event::EventPropagation,
     prelude::*,
     reactive::Scope,
-    views::{Label, Stack},
+    views::Stack,
     window::{Theme as WindowTheme, WindowConfig, WindowId},
 };
 use menus::{
     KeyHandling, app_key_event_config, close_menu, handle_app_key_down, is_menu_open, menu_bar_view,
 };
 use persistence::recent_files::{RecentFiles, load_recent_files, record_recent_file};
-use preferences::{
-    editor_font::editor_font_label,
-    theme::{self, sync_theme_preference},
-};
+use preferences::theme::{self, sync_theme_preference};
 use workspace::{
     AppState, DocumentId, DocumentSet, activate_document, create_document_state, current_name,
-    document_title_text, tab_content_view, tab_strip_view,
+    document_title_text, workspace_frame_view,
 };
 
 fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
@@ -84,83 +81,8 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
 
     let menu_bar = menu_bar_view(bootstrap.command_registry.clone(), state.clone());
 
-    let top_bar = Stack::horizontal((menu_bar,)).style({
-        let state = state.clone();
-        move |s| {
-            let theme = state.app_theme();
-            s.width_full()
-                .items_center()
-                .padding_horiz(10.0)
-                .padding_vert(6.0)
-                .background(theme.chrome_bg)
-        }
-    });
-
-    let status_strip = Stack::horizontal((
-        {
-            let state = state.clone();
-            Label::derived(move || {
-                format!(
-                    "{} {}px",
-                    editor_font_label(&state.editor_font()),
-                    state.editor_font_size()
-                )
-            })
-        }
-        .style({
-            let state = state.clone();
-            move |s| {
-                let theme = state.app_theme();
-                s.font_size(12.0).font_bold().color(theme.text)
-            }
-        }),
-        {
-            let state = state.clone();
-            Label::derived(move || state.status_message.get().unwrap_or_default())
-        }
-        .style({
-            let state = state.clone();
-            move |s| {
-                let theme = state.app_theme();
-                s.font_size(12.0)
-                    .color(theme.text_muted)
-                    .text_ellipsis()
-                    .min_width(0.0)
-                    .flex_grow(1.0)
-                    .justify_end()
-            }
-        }),
-    ))
-    .style({
-        let state = state.clone();
-        move |s| {
-            let theme = state.app_theme();
-            s.width_full()
-                .items_center()
-                .justify_between()
-                .col_gap(12.0)
-                .padding_horiz(12.0)
-                .padding_vert(8.0)
-                .background(theme.status_bg)
-                .border_top(1.0)
-                .border_color(theme.border)
-        }
-    });
-
-    let tabs_strip = tab_strip_view(state.clone());
-    let tabs_content = tab_content_view(state.clone());
-
     Stack::new((
-        Stack::vertical((top_bar, tabs_strip, tabs_content, status_strip)).style({
-            let state = state.clone();
-            move |s| {
-                let theme = state.app_theme();
-                s.size_full()
-                    .padding(10.0)
-                    .row_gap(0.0)
-                    .background(theme.panel_bg)
-            }
-        }),
+        workspace_frame_view(menu_bar, state.clone()),
         dialog_overlay(state.clone()),
     ))
     .style(|s| s.size_full())

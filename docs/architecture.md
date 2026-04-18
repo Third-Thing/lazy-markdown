@@ -30,11 +30,12 @@ The crate is split by feature and support role:
 - `src/main.rs` builds the window, top-level view tree, and app-level event hooks.
 - `src/bootstrap.rs` loads startup data before the Floem window opens.
 - `src/commands.rs` defines command metadata and built-in command dispatch used by menus and shortcuts.
-- `src/workspace/mod.rs` groups document, tab, editor-area, and workspace state code under one feature area.
+- `src/workspace/mod.rs` groups document, frame, tab, editor-area, and workspace state code under one feature area.
 - `src/workspace/state.rs` holds the core app state, document state, tab state, menu state, and the active dialog signal.
 - `src/dialogs/mod.rs` groups dialog state and exports the dialog entry points.
 - `src/dialogs/confirm.rs` contains the shared dialog overlay UI for confirm and message cases.
 - `src/workspace/documents.rs` owns document lifecycle, file open/save flows, tab activation, and close flows.
+- `src/workspace/frame.rs` contains the main workspace frame composition: top bar, tab strip, editor area, and status strip.
 - `src/workspace/editor_area.rs` contains the active editor-area view.
 - `src/workspace/tabs.rs` contains the tab strip UI.
 - `src/menus/mod.rs` groups the app menu setup and re-exports the public menu entry points.
