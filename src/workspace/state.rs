@@ -5,6 +5,7 @@ use std::{
 };
 
 use floem::{
+    kurbo::Point,
     prelude::{RwSignal, SignalGet, SignalUpdate},
     reactive::Scope,
     view::ViewId,
@@ -60,6 +61,12 @@ impl TopLevelMenuId {
 pub(crate) struct MenuUiState {
     pub(crate) open_menu: Option<TopLevelMenuId>,
     pub(crate) selected_index: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct EditorContextMenuState {
+    pub(crate) document_id: DocumentId,
+    pub(crate) position: Point,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -241,6 +248,7 @@ pub(crate) struct AppState {
     pub(crate) document_scope: Scope,
     pub(crate) documents: RwSignal<DocumentSet>,
     pub(crate) menu_state: RwSignal<MenuUiState>,
+    pub(crate) editor_context_menu: RwSignal<Option<EditorContextMenuState>>,
     menu_popup_ids: Rc<RefCell<MenuPopupIds>>,
     pub(crate) recent_files: RwSignal<RecentFiles>,
     pub(crate) status_message: RwSignal<Option<String>>,
@@ -262,6 +270,7 @@ impl AppState {
             document_scope,
             documents: RwSignal::new(DocumentSet::empty()),
             menu_state: RwSignal::new(MenuUiState::default()),
+            editor_context_menu: RwSignal::new(None),
             menu_popup_ids: Rc::new(RefCell::new(MenuPopupIds::default())),
             recent_files: RwSignal::new(recent_files),
             status_message: RwSignal::new(None::<String>),
@@ -387,6 +396,17 @@ impl AppState {
 
     pub(crate) fn active_index(&self) -> Option<usize> {
         self.documents.get().active_index()
+    }
+
+    pub(crate) fn open_editor_context_menu(&self, document_id: DocumentId, position: Point) {
+        self.editor_context_menu.set(Some(EditorContextMenuState {
+            document_id,
+            position,
+        }));
+    }
+
+    pub(crate) fn close_editor_context_menu(&self) {
+        self.editor_context_menu.set(None);
     }
 
     pub(crate) fn register_menu_popup(&self, menu_id: TopLevelMenuId, popup_id: ViewId) {

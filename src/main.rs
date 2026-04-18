@@ -27,7 +27,7 @@ use persistence::recent_files::{RecentFiles, load_recent_files, record_recent_fi
 use preferences::theme::{self, sync_theme_preference};
 use workspace::{
     AppState, DocumentId, DocumentSet, activate_document, create_document_state, current_name,
-    document_title_text, workspace_frame_view,
+    document_title_text, editor_context_menu_overlay, workspace_frame_view,
 };
 
 fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
@@ -83,6 +83,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
 
     Stack::new((
         workspace_frame_view(menu_bar, state.clone()),
+        editor_context_menu_overlay(state.clone()),
         dialog_overlay(state.clone()),
     ))
     .style(|s| s.size_full())
@@ -112,6 +113,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
             if is_menu_open(&state) {
                 close_menu(&state);
             }
+            state.close_editor_context_menu();
         }
     })
     .on_event_cont(listener::WindowCloseRequested, {

@@ -98,7 +98,33 @@ Useful upstream improvement:
 - A built-in menu bar or anchored popup menu widget with keyboard opening, arrow-key navigation, focus management, and correct overlay placement.
 - Or a supported anchored overlay helper so apps do not have to rebuild popup positioning each time.
 
-## 5. Overlay focus breaks normal shell-level key routing
+## 5. Linux context menu overlay can panic during repeated right-click interaction
+
+Affected flow:
+- editor context menu in [src/workspace/editor_area.rs](../src/workspace/editor_area.rs)
+
+What is awkward:
+- Floem exposes a `context_menu(...)` helper that looks like the direct way to add a right-click menu.
+- On Linux in this app, repeated right-click interaction against the editor could panic inside Floem's view storage while its fallback context menu overlay was being updated.
+- The failure was not in app-level menu item logic. It happened in Floem's own context-menu overlay and visual-change path.
+- Floem's stock editor-content `PointerDown` path also checks whether the pointer device is primary instead of whether the pressed button is primary, so a mouse right-click can still trigger the normal left-click selection logic.
+
+Current workaround:
+- Do not use Floem's built-in context menu helper for the editor on Linux.
+- Open an app-owned overlay menu instead and dispatch the selected action back into the stored editor.
+- Keep a local copy of Floem's editor-content pointer wiring so the app can branch on the actual pointer button and place the overlay from the editor-content view's window transform.
+
+Cost:
+- The app has to own another popup surface for a standard desktop action.
+- The direct toolkit helper cannot be trusted for this workflow.
+- The crash is easy to hit with normal repeated right-click use.
+- The app now owns a slice of editor view wiring that would otherwise be Floem's job, which raises the cost of future Floem editor updates.
+
+Useful upstream improvement:
+- Fix the lifecycle bug in Floem's Linux context menu overlay so repeated right-click open and close cycles do not leave stale view ids behind.
+- Add regression coverage around repeated secondary-click interaction while a context menu is already open.
+- Fix the editor-content button check to branch on `button == Secondary` rather than `pointer.is_primary_pointer()`.
+## 6. Overlay focus breaks normal shell-level key routing
 
 Affected flow:
 - overlay-backed menu behavior in [src/views/menu.rs](../src/views/menu.rs)
@@ -119,7 +145,7 @@ Useful upstream improvement:
 - Clear docs that focused overlay content is no longer under normal app-stack ancestors for key routing.
 - A supported window-level key handling pattern that keeps working across both normal views and overlay views.
 
-## 6. Editor focus target is not immediately available when app state switches documents
+## 7. Editor focus target is not immediately available when app state switches documents
 
 Affected flow:
 - tab activation and focus in [src/workspace/documents.rs](../src/workspace/documents.rs) and [src/workspace/editor_area.rs](../src/workspace/editor_area.rs)
@@ -140,7 +166,7 @@ Useful upstream improvement:
 - A clearer supported pattern for focusing a stored `Editor` when its view appears.
 - Or a built-in way for an editor view to follow an app-owned active state without manual reactive focus wiring.
 
-## 7. App-owned custom surfaces cannot reuse Floem theme data cleanly
+## 8. App-owned custom surfaces cannot reuse Floem theme data cleanly
 
 Affected flow:
 - app theme code in [src/preferences/theme.rs](../src/preferences/theme.rs)
@@ -163,7 +189,7 @@ Useful upstream improvement:
 - A supported way for app code to extend the active theme with custom color and spacing values.
 - Or a cleaner custom-element theme hook that updates with the same light, dark, and follow-OS flow.
 
-## 8. Dropdown is not good enough for a desktop-style font picker
+## 9. Dropdown is not good enough for a desktop-style font picker
 
 Affected flow:
 - font selector in [src/views/menu.rs](../src/views/menu.rs)

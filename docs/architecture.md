@@ -36,7 +36,7 @@ The crate is split by feature and support role:
 - `src/dialogs/confirm.rs` contains the shared dialog overlay UI for confirm and message cases.
 - `src/workspace/documents.rs` owns document lifecycle, file open/save flows, tab activation, and close flows.
 - `src/workspace/frame.rs` contains the main workspace frame composition: top bar, tab strip, editor area, and status strip.
-- `src/workspace/editor_area.rs` contains the active editor-area view.
+- `src/workspace/editor_area.rs` contains the active editor-area view, editor pointer handling, and the editor context menu overlay wiring.
 - `src/workspace/tabs.rs` contains the tab strip UI.
 - `src/menus/mod.rs` groups the app menu setup and re-exports the public menu entry points.
 - `src/menus/model.rs` holds menu item and menu model types that are shared by menu UI and menu key handling.
@@ -135,6 +135,16 @@ The current `menus/` layout also keeps one likely future contribution path visib
 Each tab owns a Floem `Editor`. Activating a tab updates app state first and then syncs focus in the rendered editor view once the matching editor view ID exists.
 
 That is more direct than introducing a separate focus manager abstraction, and it reflects how Floem view creation and focus targets actually behave.
+
+The editor context menu follows the same direct approach. Right-click actions such as copy, cut, and paste are still dispatched as Floem editor commands straight to the stored `Editor` for the active tab instead of going through the app-level command registry, but the menu surface itself is app-owned.
+
+That split is deliberate. Floem's built-in Linux context menu path crashed under repeated right-click interaction in this app, so `lazy-markdown` opens its own small overlay menu instead of relying on Floem's native context menu helper there.
+
+The editor-area code also keeps a small local copy of Floem's editor-content pointer wiring. That workaround is needed because Floem's stock editor handler currently checks whether the pointer device is primary instead of whether the pressed button is primary, which lets mouse right-clicks fall into the normal left-click selection path.
+
+When the editor already has a selection, the app keeps that selection on right-click so paste can replace it. If there is no selection, the app moves the caret to the clicked position first.
+
+The overlay anchor converts the editor-content local pointer position back into window coordinates before placing the menu. Floem delivers pointer locations in the local space of the receiving view, so app-owned overlays need that conversion to land at the actual cursor position.
 
 ### Close confirmation
 

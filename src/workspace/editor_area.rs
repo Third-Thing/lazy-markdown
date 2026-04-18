@@ -1,15 +1,405 @@
 use floem::{
+    Clipboard,
+    context::VisualChanged,
+    event::{EventPropagation, listener},
+    kurbo::{Point, Rect, Vec2},
     prelude::*,
     reactive::Effect,
+    style::CursorStyle,
+    taffy::style::Overflow,
+    ui_events::{
+        keyboard::{Key, KeyboardEvent, Modifiers},
+        pointer::{PointerButton, PointerButtonEvent, PointerState},
+    },
+    view::ViewId,
     views::{
-        editor::{keypress::default_key_handler, view::editor_container_view},
+        Container, Empty, Label, Scroll, Stack,
+        editor::{
+            Editor,
+            command::Command as EditorCommand,
+            command::CommandExecuted,
+            core::command::EditCommand,
+            keypress::{KeypressKey, default_key_handler},
+            view::{LineRegion, cursor_caret, editor_gutter, editor_view},
+        },
         tab,
     },
 };
 
 use crate::preferences::theme::editor_theme_style;
 
-use super::state::{AppState, DocumentState};
+use super::state::{AppState, DocumentId, DocumentState};
+
+const CONTEXT_MENU_CURSOR_GAP: f64 = 4.0;
+
+fn run_editor_command(document: &DocumentState, command: EditorCommand) {
+    document
+        .editor
+        .doc()
+        .run_command(&document.editor, &command, Some(1), Modifiers::empty());
+
+    if let Some(view_id) = document.editor.editor_view_id.get_untracked() {
+        view_id.request_focus();
+    }
+}
+
+fn run_editor_clipboard_command(document: &DocumentState, command: EditCommand) {
+    run_editor_command(document, EditorCommand::Edit(command));
+}
+
+fn editor_has_selection(document: &DocumentState) -> bool {
+    let doc = document.editor.doc();
+    document
+        .editor
+        .cursor
+        .with_untracked(|cursor| !cursor.edit_selection(&doc.rope_text()).is_caret())
+}
+
+fn editor_has_active_selection(editor: &floem::views::editor::Editor) -> bool {
+    let doc = editor.doc();
+    editor
+        .cursor
+        .with_untracked(|cursor| !cursor.edit_selection(&doc.rope_text()).is_caret())
+}
+
+fn editor_can_paste() -> bool {
+    Clipboard::get_contents().is_ok_and(|content| !content.is_empty())
+}
+
+fn move_caret_for_secondary_click(editor: &floem::views::editor::Editor, state: &PointerState) {
+    let mode = editor.cursor.with_untracked(|cursor| cursor.get_mode());
+    let (offset, ..) = editor.offset_of_point(mode, state.logical_point());
+    let doc = editor.doc();
+    let pointer_inside_selection = editor
+        .cursor
+        .with_untracked(|cursor| cursor.edit_selection(&doc.rope_text()).contains(offset));
+
+    if !pointer_inside_selection {
+        editor.single_click(state);
+    }
+}
+
+fn open_editor_context_menu(state: &AppState, document: &DocumentState, position: Point) {
+    state.open_editor_context_menu(document.id(), position);
+}
+
+fn context_menu_anchor(view_id: ViewId, state: &PointerState) -> Point {
+    let window_point = view_id.get_visual_transform() * state.logical_point();
+    Point::new(
+        window_point.x.round(),
+        (window_point.y + CONTEXT_MENU_CURSOR_GAP).round(),
+    )
+}
+
+fn context_menu_item(
+    title: &'static str,
+    enabled: bool,
+    action: impl Fn() + 'static,
+    state: AppState,
+) -> impl IntoView {
+    Label::new(title)
+        .style(move |s| {
+            let theme = state.app_theme();
+            s.width_full()
+                .selectable(false)
+                .font_size(14.0)
+                .padding_horiz(12.0)
+                .padding_vert(7.0)
+                .color(if enabled {
+                    theme.text
+                } else {
+                    theme.text_muted
+                })
+                .background(theme.menu_popup_bg)
+                .apply_if(enabled, |s| {
+                    s.hover(|s| s.background(theme.menu_popup_selected_bg))
+                })
+        })
+        .on_event_stop(listener::Click, move |_, _| {
+            if enabled {
+                action();
+            }
+        })
+}
+
+fn editor_context_menu_content(state: AppState, document_id: DocumentId) -> impl IntoView {
+    let document = state
+        .document_by_id_untracked(document_id)
+        .expect("context menu document");
+    let can_cut_or_copy = editor_has_selection(&document);
+    let can_paste = editor_can_paste();
+    let cut_state = state.clone();
+    let copy_state = state.clone();
+    let paste_state = state.clone();
+
+    Stack::vertical((
+        context_menu_item(
+            "Cut",
+            can_cut_or_copy,
+            {
+                let document = document.clone();
+                move || {
+                    run_editor_clipboard_command(&document, EditCommand::ClipboardCut);
+                    cut_state.close_editor_context_menu();
+                }
+            },
+            state.clone(),
+        ),
+        context_menu_item(
+            "Copy",
+            can_cut_or_copy,
+            {
+                let document = document.clone();
+                move || {
+                    run_editor_clipboard_command(&document, EditCommand::ClipboardCopy);
+                    copy_state.close_editor_context_menu();
+                }
+            },
+            state.clone(),
+        ),
+        context_menu_item(
+            "Paste",
+            can_paste,
+            {
+                let document = document;
+                move || {
+                    run_editor_clipboard_command(&document, EditCommand::ClipboardPaste);
+                    paste_state.close_editor_context_menu();
+                }
+            },
+            state.clone(),
+        ),
+    ))
+    .style(move |s| {
+        let theme = state.app_theme();
+        s.min_width(180.0)
+            .padding_vert(6.0)
+            .border(1.0)
+            .border_color(theme.border)
+            .background(theme.menu_popup_bg)
+    })
+    .on_event_stop(listener::PointerDown, move |_, _| {})
+}
+
+pub(crate) fn editor_context_menu_overlay(state: AppState) -> impl IntoView {
+    Container::derived({
+        let state = state.clone();
+        move || {
+            let Some(menu) = state.editor_context_menu.get() else {
+                return Empty::new().into_any();
+            };
+
+            Container::new(editor_context_menu_content(state.clone(), menu.document_id))
+                .style(move |s| {
+                    s.fixed()
+                        .inset_left(menu.position.x.round())
+                        .inset_top(menu.position.y.round())
+                        .z_index(400)
+                })
+                .into_any()
+        }
+    })
+    .style(move |s| {
+        s.fixed()
+            .size_full()
+            .z_index(350)
+            .apply_if(state.editor_context_menu.get().is_none(), |s| s.hide())
+    })
+    .on_event_stop(listener::PointerDown, move |_, _| {
+        state.close_editor_context_menu();
+    })
+}
+
+fn app_editor_content(
+    editor: RwSignal<Editor>,
+    document: DocumentState,
+    state: AppState,
+    is_active: impl Fn(bool) -> bool + 'static + Copy,
+    handle_key_event: impl Fn(KeypressKey) -> CommandExecuted + 'static,
+) -> impl IntoView {
+    let ed = editor.get_untracked();
+    let cursor = ed.cursor;
+    let scroll_delta = ed.scroll_delta;
+    let scroll_to = ed.scroll_to;
+    let window_origin = ed.window_origin;
+    let viewport = ed.viewport;
+
+    Scroll::new({
+        let editor_content_view =
+            editor_view(editor, is_active).style(move |s| s.absolute().cursor(CursorStyle::Text));
+        let content_id = editor_content_view.id();
+        ed.editor_view_id.set(Some(content_id));
+
+        editor_content_view
+            .on_event_cont(listener::FocusGained, move |_, _| {
+                editor.with_untracked(|ed| ed.editor_view_focused.notify())
+            })
+            .on_event_cont(listener::FocusLost, move |_, _| {
+                editor.with_untracked(|ed| ed.editor_view_focus_lost.notify())
+            })
+            .on_event_cont(listener::PointerDown, {
+                let state = state.clone();
+                move |cx,
+                      PointerButtonEvent {
+                          button,
+                          state: pointer_state,
+                          pointer,
+                      }| {
+                    content_id.request_focus();
+                    content_id.request_paint();
+
+                    match button {
+                        Some(PointerButton::Primary) => {
+                            state.close_editor_context_menu();
+                            if let Some(pointer_id) = pointer.pointer_id {
+                                cx.request_pointer_capture(pointer_id);
+                            }
+                            editor.get_untracked().pointer_down_primary(pointer_state);
+                        }
+                        Some(PointerButton::Secondary) => {
+                            let current_editor = editor.get_untracked();
+                            if !editor_has_active_selection(&current_editor) {
+                                move_caret_for_secondary_click(&current_editor, pointer_state);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            })
+            .on_event_cont(listener::PointerMove, move |_cx, pu| {
+                let editor = editor.get_untracked();
+                if editor.active.get_untracked() {
+                    content_id.request_paint();
+                }
+                editor.pointer_move(&pu.current);
+            })
+            .on_event_cont(listener::PointerUp, {
+                move |_cx,
+                      PointerButtonEvent {
+                          button,
+                          state: pointer_state,
+                          ..
+                      }| {
+                    editor.get_untracked().pointer_up(pointer_state);
+
+                    match button {
+                        Some(PointerButton::Secondary) => {
+                            open_editor_context_menu(
+                                &state,
+                                &document,
+                                context_menu_anchor(content_id, pointer_state),
+                            );
+                        }
+                        Some(PointerButton::Primary) => {
+                            state.close_editor_context_menu();
+                        }
+                        _ => {}
+                    }
+                }
+            })
+            .on_event(
+                listener::KeyDown,
+                move |cx, KeyboardEvent { key, modifiers, .. }| {
+                    if !cx.window_state.is_focused(content_id) {
+                        return EventPropagation::Continue;
+                    }
+                    if *key == Key::Named(NamedKey::Tab) {
+                        cx.prevent_default();
+                    }
+                    if handle_key_event(KeypressKey {
+                        key: key.clone(),
+                        modifiers: *modifiers,
+                    }) == CommandExecuted::Yes
+                    {
+                        cx.window_state.request_paint(cx.target);
+                    }
+
+                    let mut mods = *modifiers;
+                    mods.set(Modifiers::SHIFT, false);
+                    mods.set(Modifiers::ALT, false);
+                    #[cfg(target_os = "macos")]
+                    mods.set(Modifiers::ALT, false);
+
+                    if mods.is_empty()
+                        && let Key::Character(c) = &key
+                    {
+                        cx.window_state.request_paint(cx.target);
+                        editor.get_untracked().receive_char(c);
+                    }
+                    EventPropagation::Stop
+                },
+            )
+            .style(|s| s.min_size_full())
+    })
+    .on_event_stop(VisualChanged::listener(), move |_cx, change| {
+        window_origin.set(change.visual_window_origin());
+    })
+    .scroll_to(move || scroll_to.get().map(Vec2::to_point))
+    .scroll_delta(move || scroll_delta.get())
+    .ensure_visible(move || {
+        let editor = editor.get_untracked();
+        let cursor = cursor.get();
+        let offset = cursor.offset();
+        let _ = editor.doc_track();
+
+        let LineRegion { x, width, rvline } =
+            cursor_caret(&editor, offset, !cursor.is_insert(), cursor.affinity());
+
+        let line_height = f64::from(editor.line_height(0));
+        let vline = editor.vline_of_rvline(rvline);
+        let rect =
+            Rect::from_origin_size((x, vline.get() as f64 * line_height), (width, line_height))
+                .inflate(10.0, 1.0);
+
+        let viewport = viewport.get_untracked();
+        let smallest_distance = (viewport.y0 - rect.y0)
+            .abs()
+            .min((viewport.y1 - rect.y0).abs())
+            .min((viewport.y0 - rect.y1).abs())
+            .min((viewport.y1 - rect.y1).abs());
+        let biggest_distance = (viewport.y0 - rect.y0)
+            .abs()
+            .max((viewport.y1 - rect.y0).abs())
+            .max((viewport.y0 - rect.y1).abs())
+            .max((viewport.y1 - rect.y1).abs());
+        let jump_to_middle =
+            biggest_distance > viewport.height() && smallest_distance > viewport.height() / 2.0;
+
+        if jump_to_middle {
+            rect.inflate(0.0, viewport.height() / 2.0)
+        } else {
+            let mut rect = rect;
+            let cursor_surrounding_lines = editor.es.with(|s| s.cursor_surrounding_lines()) as f64;
+            rect.y0 -= cursor_surrounding_lines * line_height;
+            rect.y1 += cursor_surrounding_lines * line_height;
+            rect
+        }
+    })
+    .style(|s| s.size_pct(100.0, 100.0))
+}
+
+fn app_editor_container_view(
+    editor: RwSignal<Editor>,
+    document: DocumentState,
+    state: AppState,
+    is_active: impl Fn(bool) -> bool + 'static + Copy,
+    handle_key_event: impl Fn(KeypressKey) -> CommandExecuted + 'static,
+) -> impl IntoView {
+    Stack::new((
+        editor_gutter(editor),
+        app_editor_content(editor, document, state, is_active, handle_key_event),
+    ))
+    .style(|s| {
+        s.absolute()
+            .size_pct(100.0, 100.0)
+            .overflow_x(Overflow::Clip)
+            .overflow_y(Overflow::Clip)
+    })
+    .on_cleanup(move || {
+        let editor = editor.get_untracked();
+        editor.cx.get().dispose();
+    })
+}
 
 fn document_editor_view(document: DocumentState, state: AppState) -> impl IntoView {
     let editor_sig = RwSignal::new(document.editor.clone());
@@ -26,8 +416,14 @@ fn document_editor_view(document: DocumentState, state: AppState) -> impl IntoVi
         }
     });
 
-    editor_container_view(editor_sig, |_| true, default_key_handler(editor_sig)).style({
-        let state = state.clone();
+    app_editor_container_view(
+        editor_sig,
+        document,
+        state.clone(),
+        |_| true,
+        default_key_handler(editor_sig),
+    )
+    .style({
         move |s| {
             let theme = state.app_theme();
             s.apply(editor_theme_style(theme))
@@ -59,6 +455,7 @@ mod tests {
         headless::{HeadlessHarness, TestRoot},
         prelude::{SignalGet, SignalUpdate},
         reactive::Scope,
+        views::editor::core::cursor::CursorAffinity,
     };
 
     use crate::{
@@ -66,7 +463,11 @@ mod tests {
         workspace::{AppState, DocumentId, DocumentSet, activate_document, create_document_state},
     };
 
-    use super::tab_content_view;
+    use super::{
+        EditCommand, EditorCommand, editor_has_selection, run_editor_clipboard_command,
+        run_editor_command, tab_content_view,
+    };
+    use floem::views::editor::core::command::MultiSelectionCommand;
 
     #[test]
     fn tab_content_view_builds_editor_views_and_tracks_active_document() {
@@ -102,6 +503,44 @@ mod tests {
         harness.process_update_no_paint();
 
         assert_eq!(state.active_index(), Some(1));
+    }
+
+    #[test]
+    fn editor_context_menu_disables_cut_and_copy_without_a_selection() {
+        let _root = TestRoot::new();
+        let state = test_state_with_two_documents();
+        let document = state
+            .document_by_id_untracked(DocumentId::initial())
+            .expect("document");
+
+        assert!(!editor_has_selection(&document));
+
+        document.editor.cursor.update(|cursor| {
+            cursor.set_offset(0, CursorAffinity::Backward, false, false);
+            cursor.set_offset(3, CursorAffinity::Backward, true, false);
+        });
+
+        assert!(editor_has_selection(&document));
+    }
+
+    #[test]
+    fn cut_command_removes_selected_text() {
+        let _root = TestRoot::new();
+        let state = test_state_with_two_documents();
+        let document = state
+            .document_by_id_untracked(DocumentId::initial())
+            .expect("document");
+
+        run_editor_command(
+            &document,
+            EditorCommand::MultiSelection(MultiSelectionCommand::SelectAll),
+        );
+        assert!(editor_has_selection(&document));
+
+        run_editor_clipboard_command(&document, EditCommand::ClipboardCut);
+
+        assert_eq!(document.editor.doc().text().to_string(), "");
+        assert!(document.editor.doc().is_dirty());
     }
 
     fn test_state_with_two_documents() -> AppState {
