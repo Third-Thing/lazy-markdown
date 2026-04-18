@@ -8,8 +8,8 @@ use floem::{
 };
 
 use crate::{
+    preferences::theme::editor_theme_style,
     state::{AppState, DocumentState},
-    theme::editor_theme_style,
 };
 
 fn document_editor_view(document: DocumentState, state: AppState) -> impl IntoView {

@@ -143,7 +143,7 @@ Useful upstream improvement:
 ## 7. App-owned custom surfaces cannot reuse Floem theme data cleanly
 
 Affected flow:
-- app theme code in [src/theme.rs](../src/theme.rs)
+- app theme code in [src/preferences/theme.rs](../src/preferences/theme.rs)
 - custom chrome in [src/main.rs](../src/main.rs), [src/views/menu.rs](../src/views/menu.rs), [src/views/tabs.rs](../src/views/tabs.rs), and [src/views/dialogs.rs](../src/views/dialogs.rs)
 
 What is awkward:

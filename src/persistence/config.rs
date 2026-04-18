@@ -6,9 +6,8 @@ use std::{
 use atomic_write_file::AtomicWriteFile;
 
 use crate::{
-    editor_font::{default_editor_font, default_editor_font_size, normalize_editor_font_size},
     persistence::paths::app_config_file_path,
-    theme::ThemePreference,
+    preferences::{editor_font::{default_editor_font, default_editor_font_size, normalize_editor_font_size}, theme::ThemePreference},
 };
 
 const CONFIG_FILE_NAME: &str = "config.toml";
@@ -129,7 +128,7 @@ pub(crate) fn store_app_config(config: AppConfig) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::theme::ThemePreference;
+    use crate::preferences::theme::ThemePreference;
 
     use super::AppConfig;
 

@@ -4,17 +4,15 @@ mod app_keys;
 mod bootstrap;
 mod commands;
 mod documents;
-mod editor_font;
 mod persistence;
+mod preferences;
 mod shortcuts;
 mod state;
-mod theme;
 mod views;
 
 use app_keys::{KeyHandling, app_key_event_config, handle_app_key_down};
 use bootstrap::AppBootstrap;
 use documents::{activate_document, create_document_state, current_name, document_title_text};
-use editor_font::editor_font_label;
 use floem::{
     Application,
     action::current_theme,
@@ -24,9 +22,9 @@ use floem::{
     views::{Label, Stack},
     window::{Theme as WindowTheme, WindowConfig, WindowId},
 };
+use preferences::{editor_font::editor_font_label, theme::{self, sync_theme_preference}};
 use persistence::recent_files::{RecentFiles, load_recent_files, record_recent_file};
 use state::{AppState, DocumentId, DocumentSet, PendingAction};
-use theme::sync_theme_preference;
 use views::menu::{close_menu, is_menu_open};
 use views::{
     dialogs::confirm_overlay, editor::tab_content_view, menu::menu_bar_view, tabs::tab_strip_view,
