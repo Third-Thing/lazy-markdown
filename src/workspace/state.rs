@@ -13,6 +13,7 @@ use floem::{
 };
 
 use crate::{
+    dialogs::ActiveDialog,
     persistence::{
         config::{AppConfig, store_app_config},
         recent_files::RecentFiles,
@@ -22,21 +23,6 @@ use crate::{
         theme::{AppTheme, ThemePreference},
     },
 };
-
-#[derive(Clone)]
-pub(crate) enum PendingAction {
-    CloseDocument {
-        document_id: DocumentId,
-    },
-    CloseWindow {
-        window_id: floem::window::WindowId,
-        remaining_documents: Vec<DocumentId>,
-    },
-    ShowMessage {
-        title: String,
-        message: String,
-    },
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum TopLevelMenuId {
@@ -258,8 +244,7 @@ pub(crate) struct AppState {
     menu_popup_ids: Rc<RefCell<MenuPopupIds>>,
     pub(crate) recent_files: RwSignal<RecentFiles>,
     pub(crate) status_message: RwSignal<Option<String>>,
-    pub(crate) pending_action: RwSignal<Option<PendingAction>>,
-    pub(crate) show_confirm: RwSignal<bool>,
+    pub(crate) active_dialog: RwSignal<Option<ActiveDialog>>,
     pub(crate) save_as_dialog_open: RwSignal<bool>,
     pub(crate) app_config: RwSignal<AppConfig>,
     pub(crate) window_theme: RwSignal<WindowTheme>,
@@ -280,8 +265,7 @@ impl AppState {
             menu_popup_ids: Rc::new(RefCell::new(MenuPopupIds::default())),
             recent_files: RwSignal::new(recent_files),
             status_message: RwSignal::new(None::<String>),
-            pending_action: RwSignal::new(None::<PendingAction>),
-            show_confirm: RwSignal::new(false),
+            active_dialog: RwSignal::new(None::<ActiveDialog>),
             save_as_dialog_open: RwSignal::new(false),
             app_config: RwSignal::new(app_config),
             window_theme: RwSignal::new(WindowTheme::Light),
@@ -353,6 +337,22 @@ impl AppState {
 
     pub(crate) fn active_document_untracked(&self) -> Option<DocumentState> {
         self.documents.get_untracked().active_document()
+    }
+
+    pub(crate) fn active_dialog(&self) -> Option<ActiveDialog> {
+        self.active_dialog.get()
+    }
+
+    pub(crate) fn active_dialog_untracked(&self) -> Option<ActiveDialog> {
+        self.active_dialog.get_untracked()
+    }
+
+    pub(crate) fn set_active_dialog(&self, dialog: ActiveDialog) {
+        self.active_dialog.set(Some(dialog));
+    }
+
+    pub(crate) fn clear_active_dialog(&self) {
+        self.active_dialog.set(None);
     }
 
     pub(crate) fn document_by_id_untracked(&self, id: DocumentId) -> Option<DocumentState> {

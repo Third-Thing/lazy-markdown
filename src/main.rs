@@ -2,14 +2,15 @@ use std::path::PathBuf;
 
 mod bootstrap;
 mod commands;
+mod dialogs;
 mod menus;
 mod persistence;
 mod preferences;
 mod shortcuts;
-mod views;
 mod workspace;
 
 use bootstrap::AppBootstrap;
+use dialogs::{ActiveDialog, dialog_overlay};
 use floem::{
     Application,
     action::current_theme,
@@ -27,10 +28,9 @@ use preferences::{
     editor_font::editor_font_label,
     theme::{self, sync_theme_preference},
 };
-use views::dialogs::confirm_overlay;
 use workspace::{
-    AppState, DocumentId, DocumentSet, PendingAction, activate_document, create_document_state,
-    current_name, document_title_text, tab_content_view, tab_strip_view,
+    AppState, DocumentId, DocumentSet, activate_document, create_document_state, current_name,
+    document_title_text, tab_content_view, tab_strip_view,
 };
 
 fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
@@ -161,7 +161,7 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
                     .background(theme.panel_bg)
             }
         }),
-        confirm_overlay(state.clone()),
+        dialog_overlay(state.clone()),
     ))
     .style(|s| s.size_full())
     .window_title({
@@ -199,11 +199,10 @@ fn app_view(window_id: WindowId, bootstrap: AppBootstrap) -> impl IntoView {
             if let Some(first_dirty_document) = dirty_documents.first().copied() {
                 cx.prevent_default();
                 activate_document(&state, first_dirty_document);
-                state.pending_action.set(Some(PendingAction::CloseWindow {
+                state.set_active_dialog(ActiveDialog::ConfirmCloseWindow {
                     window_id,
                     remaining_documents: dirty_documents,
-                }));
-                state.show_confirm.set(true);
+                });
                 return;
             }
 

@@ -15,11 +15,12 @@ use floem::{
 };
 
 use crate::{
+    dialogs::ActiveDialog,
     persistence::recent_files::{record_recent_file, remove_recent_file},
     preferences::editor_font::editor_styling,
 };
 
-use super::state::{AppState, DocumentId, DocumentState, PendingAction, save_target_path};
+use super::state::{AppState, DocumentId, DocumentState, save_target_path};
 
 const MAX_OPEN_TABS: usize = 5;
 
@@ -91,8 +92,8 @@ fn save_document_to_path(state: &AppState, document: &DocumentState, path: &Path
             state
                 .status_message
                 .set(Some(format!("Saved {}", path.display())));
-            if let Some(action) = state.pending_action.get_untracked() {
-                finish_pending_action(action, state);
+            if let Some(dialog) = state.active_dialog_untracked() {
+                complete_dialog_action(dialog, state);
             }
         }
         Err(err) => state.status_message.set(Some(err)),
@@ -150,13 +151,12 @@ fn create_and_activate_document(
 }
 
 fn show_tab_limit_dialog(state: &AppState) {
-    state.pending_action.set(Some(PendingAction::ShowMessage {
+    state.set_active_dialog(ActiveDialog::Message {
         title: "Tab limit reached".to_string(),
         message: format!(
             "You can only keep {MAX_OPEN_TABS} tabs open at once. Close a tab before opening another file or creating a new document."
         ),
-    }));
-    state.show_confirm.set(true);
+    });
 }
 
 fn ensure_tab_capacity(state: &AppState) -> bool {
@@ -237,10 +237,7 @@ pub(crate) fn request_close_document(state: &AppState, document_id: DocumentId) 
     activate_document(state, document_id);
 
     if document.editor.doc().is_dirty() {
-        state
-            .pending_action
-            .set(Some(PendingAction::CloseDocument { document_id }));
-        state.show_confirm.set(true);
+        state.set_active_dialog(ActiveDialog::ConfirmCloseDocument { document_id });
     } else {
         close_document_now(state, document_id);
     }
@@ -259,36 +256,33 @@ fn advance_window_close(
 
     if let Some(next_document_id) = remaining_documents.first().copied() {
         activate_document(state, next_document_id);
-        state.pending_action.set(Some(PendingAction::CloseWindow {
+        state.set_active_dialog(ActiveDialog::ConfirmCloseWindow {
             window_id,
             remaining_documents,
-        }));
-        state.show_confirm.set(true);
+        });
     } else {
         if let Err(err) = state.store_app_config() {
             eprintln!("Failed to save settings on exit: {err}");
         }
-        state.pending_action.set(None);
-        state.show_confirm.set(false);
+        state.clear_active_dialog();
         close_window(window_id);
     }
 }
 
-pub(crate) fn finish_pending_action(action: PendingAction, state: &AppState) {
-    state.pending_action.set(None);
-    state.show_confirm.set(false);
+pub(crate) fn complete_dialog_action(dialog: ActiveDialog, state: &AppState) {
+    state.clear_active_dialog();
 
-    match action {
-        PendingAction::CloseDocument { document_id } => {
+    match dialog {
+        ActiveDialog::ConfirmCloseDocument { document_id } => {
             close_document_now(state, document_id);
         }
-        PendingAction::CloseWindow {
+        ActiveDialog::ConfirmCloseWindow {
             window_id,
             remaining_documents,
         } => {
             advance_window_close(window_id, remaining_documents, state);
         }
-        PendingAction::ShowMessage { .. } => {}
+        ActiveDialog::Message { .. } => {}
     }
 }
 
@@ -369,8 +363,9 @@ mod tests {
     };
 
     use crate::{
+        dialogs::ActiveDialog,
         persistence::{config::AppConfig, recent_files::RecentFiles},
-        workspace::{AppState, DocumentId, DocumentSet, PendingAction},
+        workspace::{AppState, DocumentId, DocumentSet},
     };
 
     use super::{MAX_OPEN_TABS, create_document_state, create_new_tab, open_document_path};
@@ -383,10 +378,9 @@ mod tests {
         create_new_tab(&state);
 
         assert_eq!(state.document_count_untracked(), MAX_OPEN_TABS);
-        assert!(state.show_confirm.get_untracked());
         assert!(matches!(
-            state.pending_action.get_untracked(),
-            Some(PendingAction::ShowMessage { .. })
+            state.active_dialog_untracked(),
+            Some(ActiveDialog::Message { .. })
         ));
     }
 
@@ -399,10 +393,9 @@ mod tests {
         open_document_path(&state, path.clone());
 
         assert_eq!(state.document_count_untracked(), MAX_OPEN_TABS);
-        assert!(state.show_confirm.get_untracked());
         assert!(matches!(
-            state.pending_action.get_untracked(),
-            Some(PendingAction::ShowMessage { .. })
+            state.active_dialog_untracked(),
+            Some(ActiveDialog::Message { .. })
         ));
 
         let _ = fs::remove_file(path);
@@ -434,8 +427,7 @@ mod tests {
             state.documents.get_untracked().active_document_id(),
             Some(target_document_id)
         );
-        assert!(!state.show_confirm.get_untracked());
-        assert!(state.pending_action.get_untracked().is_none());
+        assert!(state.active_dialog_untracked().is_none());
 
         let _ = fs::remove_file(target_path);
     }

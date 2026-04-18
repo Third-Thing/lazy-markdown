@@ -31,7 +31,9 @@ The crate is split by feature and support role:
 - `src/bootstrap.rs` loads startup data before the Floem window opens.
 - `src/commands.rs` defines command metadata and built-in command dispatch used by menus and shortcuts.
 - `src/workspace/mod.rs` groups document, tab, editor-area, and workspace state code under one feature area.
-- `src/workspace/state.rs` holds the core app state, document state, tab state, menu state, and pending modal actions.
+- `src/workspace/state.rs` holds the core app state, document state, tab state, menu state, and the active dialog signal.
+- `src/dialogs/mod.rs` groups dialog state and exports the dialog entry points.
+- `src/dialogs/confirm.rs` contains the shared dialog overlay UI for confirm and message cases.
 - `src/workspace/documents.rs` owns document lifecycle, file open/save flows, tab activation, and close flows.
 - `src/workspace/editor_area.rs` contains the active editor-area view.
 - `src/workspace/tabs.rs` contains the tab strip UI.
@@ -39,7 +41,6 @@ The crate is split by feature and support role:
 - `src/menus/model.rs` holds menu item and menu model types that are shared by menu UI and menu key handling.
 - `src/menus/view.rs` contains the Floem menu bar and popup UI.
 - `src/menus/keys.rs` handles app-level menu capture, popup navigation keys, and menu activation.
-- `src/views/` currently contains dialog views.
 - `src/shortcuts.rs` handles command shortcut matching when the menu system does not consume the keypress.
 - `src/persistence/` holds config loading, recent-file storage, and per-platform storage paths.
 - `src/preferences/` holds app theme behavior and editor font preferences.
@@ -52,7 +53,7 @@ The app is built around one Floem window with a small set of app-owned surfaces:
 2. a tab strip
 3. the active editor area
 4. a status strip
-5. a confirm overlay for save/discard and message dialogs
+5. a dialog overlay for save/discard and message dialogs
 
 The same `AppState` instance is shared across those surfaces. Floem signals and effects keep the UI in sync with:
 
@@ -63,7 +64,7 @@ The same `AppState` instance is shared across those surfaces. Floem signals and 
 - theme preference
 - editor font family and size
 - status messages
-- pending close or dialog actions
+- the active dialog, when one is open
 
 This is intentionally a Floem app with support modules, not a generic editor core with a Floem shell.
 
@@ -73,7 +74,7 @@ Three state types carry most of the runtime model.
 
 - `DocumentState` stores a stable `DocumentId`, an optional file path signal, and a Floem `Editor`.
 - `DocumentSet` stores the open tabs, the active document ID, and the next document ID to allocate.
-- `AppState` stores the document set plus window-level state such as menu state, popup IDs, recent files, pending actions, confirm visibility, dialog guards, config, and theme state.
+- `AppState` stores the document set plus window-level state such as menu state, popup IDs, recent files, the active dialog, dialog guards, config, and theme state.
 
 This is an important architectural choice: document state owns Floem editor objects directly. The app does not try to wrap the editor in a toolkit-neutral model.
 
@@ -134,13 +135,13 @@ That is more direct than introducing a separate focus manager abstraction, and i
 
 ### Close confirmation
 
-The confirm overlay is one reusable Floem surface that handles:
+The dialog overlay is one reusable Floem surface that handles:
 
 - closing a dirty tab
 - closing a window with dirty documents
 - simple app message dialogs such as the tab-limit warning
 
-The current action is tracked through `PendingAction`, and the overlay reads that state to decide its title, message, buttons, and follow-up behavior.
+The current dialog is tracked through one `active_dialog` signal, and the overlay reads that single source of truth to decide its title, message, buttons, and follow-up behavior.
 
 ### Theme and editor styling
 
@@ -188,7 +189,7 @@ The command registry helps the app avoid duplicating labels and shortcut definit
 
 `file.new` creates a fresh untitled tab. `file.open` opens a Floem file dialog, reads the selected file into a new tab, and records the path in recent files. If the selected path is already open, the app activates that existing tab instead of opening a duplicate.
 
-The app currently enforces a hard cap of five open tabs. If the user tries to open more, the app shows a modal message through the same confirm overlay system.
+The app currently enforces a hard cap of five open tabs. If the user tries to open more, the app shows a modal message through the same dialog overlay system.
 
 Saving is also handled directly in `src/workspace/documents.rs`.
 

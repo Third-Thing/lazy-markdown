@@ -5,10 +5,11 @@ use floem::{
 
 use crate::{
     commands::{command_ids, invoke_command},
-    workspace::{AppState, PendingAction, finish_pending_action},
+    workspace::{AppState, complete_dialog_action},
 };
 
-pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
+pub(crate) fn dialog_overlay(state: AppState) -> Overlay {
+    let backdrop_state = state.clone();
     let backdrop = Empty::new()
         .style({
             let state = state.clone();
@@ -21,8 +22,7 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
             }
         })
         .on_event_cont(listener::Click, move |_, _| {
-            state.pending_action.set(None);
-            state.show_confirm.set(false);
+            backdrop_state.clear_active_dialog();
         });
 
     let buttons = {
@@ -35,16 +35,13 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
                     .action(move || {
                         invoke_command(command_ids::FILE_SAVE, &action_state);
                     })
-                    .style({
-                        move |s| {
-                            s.apply_if(
-                                matches!(
-                                    style_state.pending_action.get(),
-                                    Some(PendingAction::ShowMessage { .. }) | None
-                                ),
-                                |s| s.hide(),
-                            )
-                        }
+                    .style(move |s| {
+                        s.apply_if(
+                            !style_state
+                                .active_dialog()
+                                .is_some_and(|dialog| dialog.needs_save_decision()),
+                            |s| s.hide(),
+                        )
                     })
             },
             {
@@ -52,22 +49,19 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
                 let style_state = state.clone();
                 Button::new("Don't Save")
                     .action(move || {
-                        if let Some(action) = action_state.pending_action.get_untracked() {
-                            finish_pending_action(action, &action_state);
+                        if let Some(dialog) = action_state.active_dialog_untracked() {
+                            complete_dialog_action(dialog, &action_state);
                         } else {
-                            action_state.show_confirm.set(false);
+                            action_state.clear_active_dialog();
                         }
                     })
-                    .style({
-                        move |s| {
-                            s.apply_if(
-                                matches!(
-                                    style_state.pending_action.get(),
-                                    Some(PendingAction::ShowMessage { .. }) | None
-                                ),
-                                |s| s.hide(),
-                            )
-                        }
+                    .style(move |s| {
+                        s.apply_if(
+                            !style_state
+                                .active_dialog()
+                                .is_some_and(|dialog| dialog.needs_save_decision()),
+                            |s| s.hide(),
+                        )
                     })
             },
             {
@@ -75,19 +69,15 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
                 let style_state = state.clone();
                 Button::new("Cancel")
                     .action(move || {
-                        action_state.pending_action.set(None);
-                        action_state.show_confirm.set(false);
+                        action_state.clear_active_dialog();
                     })
-                    .style({
-                        move |s| {
-                            s.apply_if(
-                                matches!(
-                                    style_state.pending_action.get(),
-                                    Some(PendingAction::ShowMessage { .. })
-                                ),
-                                |s| s.hide(),
-                            )
-                        }
+                    .style(move |s| {
+                        s.apply_if(
+                            style_state
+                                .active_dialog()
+                                .is_some_and(|dialog| !dialog.needs_save_decision()),
+                            |s| s.hide(),
+                        )
                     })
             },
             {
@@ -95,19 +85,15 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
                 let style_state = state.clone();
                 Button::new("OK")
                     .action(move || {
-                        action_state.pending_action.set(None);
-                        action_state.show_confirm.set(false);
+                        action_state.clear_active_dialog();
                     })
-                    .style({
-                        move |s| {
-                            s.apply_if(
-                                !matches!(
-                                    style_state.pending_action.get(),
-                                    Some(PendingAction::ShowMessage { .. })
-                                ),
-                                |s| s.hide(),
-                            )
-                        }
+                    .style(move |s| {
+                        s.apply_if(
+                            !style_state
+                                .active_dialog()
+                                .is_some_and(|dialog| !dialog.needs_save_decision()),
+                            |s| s.hide(),
+                        )
                     })
             },
         ))
@@ -116,26 +102,22 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
 
     let title = {
         let state = state.clone();
-        Label::derived(move || match state.pending_action.get() {
-            Some(PendingAction::CloseDocument { .. }) => "Unsaved changes".to_string(),
-            Some(PendingAction::CloseWindow { .. }) => "Unsaved changes".to_string(),
-            Some(PendingAction::ShowMessage { title, .. }) => title,
-            None => "Unsaved changes".to_string(),
+        Label::derived(move || {
+            state
+                .active_dialog()
+                .map(|dialog| dialog.title_text())
+                .unwrap_or_else(|| "Unsaved changes".to_string())
         })
     }
     .style(|s| s.font_size(18.0).font_bold());
 
     let message = {
         let state = state.clone();
-        Label::derived(move || match state.pending_action.get() {
-            Some(PendingAction::CloseDocument { .. }) => {
-                "Save your changes before closing this tab?".to_string()
-            }
-            Some(PendingAction::CloseWindow { .. }) => {
-                "Save your changes before closing this window?".to_string()
-            }
-            Some(PendingAction::ShowMessage { message, .. }) => message,
-            None => "Save your changes before continuing?".to_string(),
+        Label::derived(move || {
+            state
+                .active_dialog()
+                .map(|dialog| dialog.message_text())
+                .unwrap_or_else(|| "Save your changes before continuing?".to_string())
         })
     }
     .style(|s| s.width_full().max_width_full().min_width(0.0).text_wrap());
@@ -176,11 +158,9 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
                 .border_color(theme.dialog_path_border)
                 .border_radius(8.0)
                 .apply_if(
-                    !matches!(
-                        state.pending_action.get(),
-                        Some(PendingAction::CloseDocument { .. })
-                            | Some(PendingAction::CloseWindow { .. })
-                    ),
+                    !state
+                        .active_dialog()
+                        .is_some_and(|dialog| dialog.shows_document_path()),
                     |s| s.hide(),
                 )
         }
@@ -212,7 +192,7 @@ pub(crate) fn confirm_overlay(state: AppState) -> Overlay {
                 .inset(0.0)
                 .width_full()
                 .height_full()
-                .apply_if(!state.show_confirm.get(), |s| s.hide())
+                .apply_if(state.active_dialog().is_none(), |s| s.hide())
         })
     })
 }
