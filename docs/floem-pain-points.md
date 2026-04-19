@@ -212,3 +212,27 @@ Useful upstream improvement:
 - Support keyboard navigation and hover-driven highlight updates in `Dropdown`.
 - Expose a supported way to configure dropdown popup sizing, especially max height.
 - Or expose the popup container and scroll styling hooks needed to make long dropdowns behave like normal desktop pickers.
+
+## 10. Editor content has no built-in inset to stay clear of overlaid scrollbars
+
+Affected flow:
+- editor area in [src/workspace/editor_area.rs](../src/workspace/editor_area.rs)
+
+What is awkward:
+- Floem's editor content is wrapped in a `Scroll` view whose vertical scrollbar is drawn over the same visual area as the text.
+- Floem exposes scrollbar styling and track inset controls, but not a small editor-content inset for reserving space so text does not sit under the vertical bar.
+- Floem's default `editor_content` helper styles the editor view with `position: absolute`. Absolute children use the parent's padding box as their containing block, so the obvious fix of wrapping the editor in a padded container (or adding padding to the `Scroll`) does not shrink the editor's paint area at all.
+- Removing `position: absolute` is also not free: an earlier attempt that kept `absolute()` and wrapped the editor in a `Container` sized to `size_pct(100%, 100%)` with `padding_right` caused the `Scroll` view to read the wrapper's layout rect as the content size, see exactly the viewport size, and stop showing a scrollbar at all. Both pieces of this problem (absolute positioning and overflow detection through a wrapper) have to be solved together.
+
+Current workaround:
+- Drop `position: absolute` from the editor content view so it participates in normal flow and respects the scroll view's content box.
+- Apply `padding_right` on the `Scroll` itself to reserve space for the bar. Because the child is no longer absolute, the padding actually shrinks the text area instead of being ignored.
+
+Cost:
+- App code owns a slice of what is normally Floem's default editor wiring, which raises the cost of future Floem editor updates.
+- The fix has to diverge from Floem's own `editor_content` helper even though the rest of that helper's structure is still desirable.
+
+Useful upstream improvement:
+- Add a supported editor-content inset or right padding hook for the scrollable text region.
+- Or make the default editor scrollbars reserve layout space instead of overlapping the content.
+- Or drop `position: absolute` from the default editor content view so normal container padding works as expected.

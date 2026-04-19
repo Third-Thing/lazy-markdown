@@ -31,6 +31,7 @@ use crate::preferences::theme::editor_theme_style;
 use super::state::{AppState, DocumentId, DocumentState};
 
 const CONTEXT_MENU_CURSOR_GAP: f64 = 4.0;
+const EDITOR_SCROLLBAR_CLEARANCE: f64 = 12.0;
 
 fn run_editor_command(document: &DocumentState, command: EditorCommand) {
     document
@@ -219,7 +220,7 @@ fn app_editor_content(
 
     Scroll::new({
         let editor_content_view =
-            editor_view(editor, is_active).style(move |s| s.absolute().cursor(CursorStyle::Text));
+            editor_view(editor, is_active).style(move |s| s.cursor(CursorStyle::Text));
         let content_id = editor_content_view.id();
         ed.editor_view_id.set(Some(content_id));
 
@@ -366,7 +367,10 @@ fn app_editor_content(
             rect
         }
     })
-    .style(|s| s.size_pct(100.0, 100.0))
+    .style(|s| {
+        s.size_pct(100.0, 100.0)
+            .padding_right(EDITOR_SCROLLBAR_CLEARANCE)
+    })
 }
 
 fn app_editor_container_view(
@@ -458,8 +462,9 @@ mod tests {
     };
 
     use super::{
-        EditCommand, EditorCommand, editor_has_selection, move_caret_for_secondary_click,
-        run_editor_clipboard_command, run_editor_command, tab_content_view,
+        EDITOR_SCROLLBAR_CLEARANCE, EditCommand, EditorCommand, editor_has_selection,
+        move_caret_for_secondary_click, run_editor_clipboard_command, run_editor_command,
+        tab_content_view,
     };
     use floem::views::editor::core::command::MultiSelectionCommand;
     use floem::ui_events::pointer::PointerState;
@@ -498,6 +503,49 @@ mod tests {
         harness.process_update_no_paint();
 
         assert_eq!(state.active_index(), Some(1));
+    }
+
+    #[test]
+    fn editor_viewport_reserves_space_for_the_scrollbar() {
+        let root = TestRoot::new();
+        let state = test_state_with_overflowing_document();
+        let document = state
+            .document_by_id_untracked(DocumentId::initial())
+            .expect("document");
+        let mut harness =
+            HeadlessHarness::new_with_size(root, tab_content_view(state), 920.0, 160.0);
+
+        harness.rebuild();
+
+        let editor_view_id = document
+            .editor
+            .editor_view_id
+            .get_untracked()
+            .expect("editor view id");
+        let scroll_id = editor_view_id.parent().expect("scroll");
+        let editor_rect = editor_view_id.get_visual_rect();
+        let scroll_rect = scroll_id.get_visual_rect();
+
+        assert!(
+            scroll_rect.x1 - editor_rect.x1 >= EDITOR_SCROLLBAR_CLEARANCE - 0.1,
+            "expected editor content to stop at least {EDITOR_SCROLLBAR_CLEARANCE}px before the scroll's right edge, got scroll={scroll_rect:?} editor={editor_rect:?}",
+        );
+
+        let viewport = document.editor.viewport.get_untracked();
+        let last_line = document.editor.last_vline().get();
+        let line_height = f64::from(document.editor.line_height(0));
+        let content_height = line_height * (last_line + 1) as f64;
+        assert!(
+            content_height > viewport.height(),
+            "test setup must overflow vertically so the scrollbar has a reason to appear, got content_height={content_height} viewport={viewport:?}",
+        );
+
+        let editor_layout = editor_view_id.get_layout_rect_local();
+        let scroll_layout = scroll_id.get_content_rect();
+        assert!(
+            editor_layout.height() > scroll_layout.height() + 1.0,
+            "editor layout must report more height than the scroll's content area so the scroll view shows a vertical scrollbar, got editor={editor_layout:?} scroll_content={scroll_layout:?}",
+        );
     }
 
     #[test]
@@ -630,6 +678,26 @@ mod tests {
             state.editor_font_size_untracked(),
         );
         state.push_document(second_document);
+        activate_document(&state, DocumentId::initial());
+        state
+    }
+
+    fn test_state_with_overflowing_document() -> AppState {
+        let scope = Scope::new();
+        let state = AppState::new(scope, RecentFiles::default(), AppConfig::default());
+        let text = (0..200)
+            .map(|index| format!("line {index}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let document = create_document_state(
+            scope,
+            DocumentId::initial(),
+            None,
+            text,
+            state.editor_font_untracked(),
+            state.editor_font_size_untracked(),
+        );
+        state.documents.set(DocumentSet::new(document));
         activate_document(&state, DocumentId::initial());
         state
     }

@@ -146,6 +146,8 @@ When the editor already has a selection, the app keeps that selection on right-c
 
 The overlay anchor converts the editor-content local pointer position back into window coordinates before placing the menu. Floem delivers pointer locations in the local space of the receiving view, so app-owned overlays need that conversion to land at the actual cursor position.
 
+The editor content view is placed directly in its `Scroll` parent without `position: absolute`, and the `Scroll` itself carries a small right-side padding so Floem's overlaid vertical scrollbar does not cover the last character. Floem's default editor content helper styles the editor view absolute, which would make any padding on a wrapper invisible to the absolute child; dropping that positioning is what lets the scroll's padding actually reserve space.
+
 ### Close confirmation
 
 The dialog overlay is one reusable Floem surface that handles:
