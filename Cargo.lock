@@ -795,7 +795,7 @@ checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
 [[package]]
 name = "floem"
 version = "0.2.0"
-source = "git+https://github.com/Third-Thing/floem.git?branch=dirty-tracking-and-stale-cursor-crash-fix#0ca5f8f29fd6ba74a69eea98ad30d689b91e22c6"
+source = "git+https://github.com/Third-Thing/floem.git?branch=steady-flo-gui#be7b975f711b7a1eb3af2c04f631e8996784d486"
 dependencies = [
  "bitflags 2.11.0",
  "clipboard-win",
@@ -849,7 +849,7 @@ dependencies = [
 [[package]]
 name = "floem-editor-core"
 version = "0.2.0"
-source = "git+https://github.com/Third-Thing/floem.git?branch=dirty-tracking-and-stale-cursor-crash-fix#0ca5f8f29fd6ba74a69eea98ad30d689b91e22c6"
+source = "git+https://github.com/Third-Thing/floem.git?branch=steady-flo-gui#be7b975f711b7a1eb3af2c04f631e8996784d486"
 dependencies = [
  "bitflags 2.11.0",
  "itertools",
@@ -1093,7 +1093,7 @@ dependencies = [
 [[package]]
 name = "floem_reactive"
 version = "0.2.0"
-source = "git+https://github.com/Third-Thing/floem.git?branch=dirty-tracking-and-stale-cursor-crash-fix#0ca5f8f29fd6ba74a69eea98ad30d689b91e22c6"
+source = "git+https://github.com/Third-Thing/floem.git?branch=steady-flo-gui#be7b975f711b7a1eb3af2c04f631e8996784d486"
 dependencies = [
  "parking_lot",
  "smallvec",
@@ -1102,7 +1102,7 @@ dependencies = [
 [[package]]
 name = "floem_renderer"
 version = "0.2.0"
-source = "git+https://github.com/Third-Thing/floem.git?branch=dirty-tracking-and-stale-cursor-crash-fix#0ca5f8f29fd6ba74a69eea98ad30d689b91e22c6"
+source = "git+https://github.com/Third-Thing/floem.git?branch=steady-flo-gui#be7b975f711b7a1eb3af2c04f631e8996784d486"
 dependencies = [
  "floem-winit",
  "fontique",
@@ -1118,7 +1118,7 @@ dependencies = [
 [[package]]
 name = "floem_tiny_skia_renderer"
 version = "0.2.0"
-source = "git+https://github.com/Third-Thing/floem.git?branch=dirty-tracking-and-stale-cursor-crash-fix#0ca5f8f29fd6ba74a69eea98ad30d689b91e22c6"
+source = "git+https://github.com/Third-Thing/floem.git?branch=steady-flo-gui#be7b975f711b7a1eb3af2c04f631e8996784d486"
 dependencies = [
  "anyhow",
  "floem_renderer",
@@ -1134,7 +1134,7 @@ dependencies = [
 [[package]]
 name = "floem_vger_renderer"
 version = "0.2.0"
-source = "git+https://github.com/Third-Thing/floem.git?branch=dirty-tracking-and-stale-cursor-crash-fix#0ca5f8f29fd6ba74a69eea98ad30d689b91e22c6"
+source = "git+https://github.com/Third-Thing/floem.git?branch=steady-flo-gui#be7b975f711b7a1eb3af2c04f631e8996784d486"
 dependencies = [
  "anyhow",
  "floem-vger",
@@ -1942,7 +1942,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-markdown"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "atomic-write-file",
  "floem",
@@ -3701,7 +3701,7 @@ dependencies = [
 [[package]]
 name = "ui-events-floem-winit"
 version = "0.2.0"
-source = "git+https://github.com/Third-Thing/floem.git?branch=dirty-tracking-and-stale-cursor-crash-fix#0ca5f8f29fd6ba74a69eea98ad30d689b91e22c6"
+source = "git+https://github.com/Third-Thing/floem.git?branch=steady-flo-gui#be7b975f711b7a1eb3af2c04f631e8996784d486"
 dependencies = [
  "dpi 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "floem-winit",

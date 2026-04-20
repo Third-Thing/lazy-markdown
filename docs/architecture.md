@@ -148,6 +148,8 @@ The overlay anchor converts the editor-content local pointer position back into 
 
 The editor content view is placed directly in its `Scroll` parent without `position: absolute`, and the `Scroll` itself carries a small right-side padding so Floem's overlaid vertical scrollbar does not cover the last character. Floem's default editor content helper styles the editor view absolute, which would make any padding on a wrapper invisible to the absolute child; dropping that positioning is what lets the scroll's padding actually reserve space.
 
+Because this editor-content wrapper is app-owned, upstream fixes in Floem's stock `ensure_visible` path do not automatically land here. The local wrapper now eagerly materializes text layouts up to the caret line before calling `vline_of_rvline` so wrapped paragraphs are counted correctly after cache invalidation, but that also means future upstream editor-scroll fixes still need to be ported deliberately.
+
 ### Close confirmation
 
 The dialog overlay is one reusable Floem surface that handles:

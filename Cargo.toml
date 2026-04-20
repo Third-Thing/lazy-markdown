@@ -3,11 +3,11 @@ name = "lazy-markdown"
 description = "The laziest, most efficient markdown editor (citation needed)."
 readme = "README.md"
 edition = "2024"
-version = "0.4.1"
+version = "0.4.2"
 license = "BlueOak-1.0.0"
 repository = "https://github.com/Third-Thing/lazy-markdown"
 
 [dependencies]
-floem = { git = "https://github.com/Third-Thing/floem.git", branch = "dirty-tracking-and-stale-cursor-crash-fix" }
+floem = { git = "https://github.com/Third-Thing/floem.git", branch = "steady-flo-gui" }
 atomic-write-file = { version = "0.3.0", features = ["unnamed-tmpfile"] }
 keyboard-types = "0.8.3"

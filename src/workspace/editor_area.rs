@@ -338,6 +338,9 @@ fn app_editor_content(
             cursor_caret(&editor, offset, !cursor.is_insert(), cursor.affinity());
 
         let line_height = f64::from(editor.line_height(0));
+        for line in 0..=rvline.line {
+            editor.text_layout(line);
+        }
         let vline = editor.vline_of_rvline(rvline);
         let rect =
             Rect::from_origin_size((x, vline.get() as f64 * line_height), (width, line_height))
