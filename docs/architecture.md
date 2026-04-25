@@ -46,6 +46,12 @@ The crate is split by feature and support role:
 - `src/persistence/` holds config loading, recent-file storage, and per-platform storage paths.
 - `src/preferences/` holds app theme behavior and editor font preferences.
 
+Experimental code that is not part of the shipped Floem app lives under `experiments/`.
+`experiments/gpui-editor-probe/` is a standalone GPUI Component crate used to evaluate
+the editor component, app menu bar, file-dialog flows, and dirty-document confirmation
+dialogs, including window-close interception, before any conversion work touches the main
+application.
+
 Feature modules also keep their own focused `#[cfg(test)]` coverage nearby. The current test layout favors headless interaction tests in the same modules as the menu, tab, document, command, and preference flows they exercise.
 
 ## Runtime Shape
