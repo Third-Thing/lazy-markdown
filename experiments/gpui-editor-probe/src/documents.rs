@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    io::ErrorKind,
+    path::{Path, PathBuf},
+};
 
 use gpui::{
     AppContext as _, Context, Entity, Focusable as _, PathPromptOptions, SharedString, Window,
@@ -10,7 +13,7 @@ use gpui_component::{
     input::{InputEvent, InputState},
 };
 
-use crate::window::ProbeWindow;
+use crate::{persistence::store_recent_files, window::ProbeWindow};
 
 pub(crate) const MAX_OPEN_TABS: usize = 5;
 
@@ -174,18 +177,65 @@ impl ProbeWindow {
     ) {
         if let Some(document_id) = self.document_id_for_path(&path) {
             self.activate_document(document_id, window, cx);
-            self.status = format!("Switched to {}", path.display()).into();
+            if self.record_recent_file(&path, cx) {
+                self.status = format!("Switched to {}", path.display()).into();
+            }
             cx.notify();
             return;
         }
 
-        self.create_document(
-            Some(path.clone()),
-            contents,
-            format!("Opened {}", path.display()).into(),
-            window,
-            cx,
-        );
+        if self
+            .create_document(
+                Some(path.clone()),
+                contents,
+                format!("Opened {}", path.display()).into(),
+                window,
+                cx,
+            )
+            .is_some()
+        {
+            self.record_recent_file(&path, cx);
+        }
+    }
+
+    pub(crate) fn open_document_path_from_disk(
+        &mut self,
+        path: PathBuf,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(document_id) = self.document_id_for_path(&path) {
+            self.activate_document(document_id, window, cx);
+            if self.record_recent_file(&path, cx) {
+                self.status = format!("Switched to {}", path.display()).into();
+            }
+            cx.notify();
+            return;
+        }
+
+        if !self.ensure_tab_capacity(window, cx) {
+            return;
+        }
+
+        match std::fs::read_to_string(&path) {
+            Ok(contents) => {
+                self.create_document(
+                    Some(path.clone()),
+                    contents,
+                    format!("Opened {}", path.display()).into(),
+                    window,
+                    cx,
+                );
+                self.record_recent_file(&path, cx);
+            }
+            Err(err) => {
+                if err.kind() == ErrorKind::NotFound {
+                    self.remove_recent_file(&path, cx);
+                }
+                self.status = format!("Failed to open {}: {err}", path.display()).into();
+                cx.notify();
+            }
+        }
     }
 
     pub(crate) fn save_to_path(
@@ -204,7 +254,9 @@ impl ProbeWindow {
                 document.current_path = Some(path.to_path_buf());
                 document.pristine_text = contents;
                 document.dirty = false;
-                self.status = format!("Saved {}", path.display()).into();
+                if self.record_recent_file(path, cx) {
+                    self.status = format!("Saved {}", path.display()).into();
+                }
             }
             Err(err) => {
                 self.status = format!("Failed to save {}: {err}", path.display()).into();
@@ -254,7 +306,9 @@ impl ProbeWindow {
                                 document.current_path = Some(path.clone());
                                 document.pristine_text = contents.clone();
                                 document.dirty = false;
-                                this.status = format!("Saved {}", path.display()).into();
+                                if this.record_recent_file(&path, cx) {
+                                    this.status = format!("Saved {}", path.display()).into();
+                                }
                             }
                         }
                         Err(err) => {
@@ -267,6 +321,51 @@ impl ProbeWindow {
             });
         })
         .detach();
+    }
+
+    fn record_recent_file(&mut self, path: &Path, cx: &mut Context<Self>) -> bool {
+        if !self.recent_files.add_path(path) {
+            return true;
+        }
+
+        if let Err(err) = store_recent_files(&self.recent_files) {
+            self.status = err.into();
+            cx.notify();
+            return false;
+        }
+
+        self.reload_app_menus(cx);
+        true
+    }
+
+    fn remove_recent_file(&mut self, path: &Path, cx: &mut Context<Self>) {
+        if !self.recent_files.remove_path(path) {
+            return;
+        }
+
+        if let Err(err) = store_recent_files(&self.recent_files) {
+            self.status = err.into();
+            cx.notify();
+            return;
+        }
+
+        self.reload_app_menus(cx);
+    }
+
+    pub(crate) fn clear_recent_files(&mut self, cx: &mut Context<Self>) {
+        if !self.recent_files.clear() {
+            return;
+        }
+
+        if let Err(err) = store_recent_files(&self.recent_files) {
+            self.status = err.into();
+            cx.notify();
+            return;
+        }
+
+        self.reload_app_menus(cx);
+        self.status = "Cleared recent files".into();
+        cx.notify();
     }
 
     pub(crate) fn request_close_document(

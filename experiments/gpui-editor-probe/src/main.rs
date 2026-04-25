@@ -1,15 +1,25 @@
-use gpui::{App, AppContext as _, WindowBounds, WindowOptions, actions, px, size};
+use gpui::{Action, App, AppContext as _, WindowBounds, WindowOptions, actions, px, size};
 use gpui_component::Root;
 use gpui_component_assets::Assets;
+use serde::Deserialize;
 
 mod documents;
 mod menus;
+mod persistence;
 mod view;
 mod window;
 
 use window::ProbeWindow;
 
 actions!(probe, [New, Open, Save, SaveAs]);
+
+#[derive(Action, Clone, PartialEq, Eq, Deserialize)]
+#[action(namespace = probe, no_json)]
+pub(crate) struct OpenRecent(pub(crate) String);
+
+#[derive(Action, Clone, PartialEq, Eq, Deserialize)]
+#[action(namespace = probe, no_json)]
+pub(crate) struct ClearRecentFiles;
 
 fn main() {
     let app = gpui_platform::application().with_assets(Assets);

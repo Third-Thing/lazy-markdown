@@ -49,6 +49,8 @@ impl Render for ProbeWindow {
             .on_action(cx.listener(Self::on_open))
             .on_action(cx.listener(Self::on_save))
             .on_action(cx.listener(Self::on_save_as))
+            .on_action(cx.listener(Self::on_open_recent))
+            .on_action(cx.listener(Self::on_clear_recent_files))
             .child(
                 div()
                     .w_full()

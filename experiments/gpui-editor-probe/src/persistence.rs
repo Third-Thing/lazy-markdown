@@ -1,0 +1,146 @@
+use std::{
+    env, fs,
+    io::{ErrorKind, Write},
+    path::{Path, PathBuf},
+};
+
+const APP_DIR_NAME: &str = "lazy-markdown";
+const RECENT_FILES_NAME: &str = "recent-files.txt";
+const MAX_RECENT_FILES: usize = 10;
+
+#[derive(Clone, Default)]
+pub(crate) struct RecentFiles {
+    entries: Vec<PathBuf>,
+}
+
+impl RecentFiles {
+    pub(crate) fn paths(&self) -> Vec<PathBuf> {
+        self.entries.clone()
+    }
+
+    pub(crate) fn add_path(&mut self, path: &Path) -> bool {
+        if !path.exists() {
+            return false;
+        }
+
+        let path = save_target_path(path);
+        self.entries.retain(|existing| !same_path(existing, &path));
+        self.entries.insert(0, path);
+        self.entries.truncate(MAX_RECENT_FILES);
+        true
+    }
+
+    pub(crate) fn remove_path(&mut self, path: &Path) -> bool {
+        let original_len = self.entries.len();
+        self.entries.retain(|existing| !same_path(existing, path));
+        self.entries.len() != original_len
+    }
+
+    pub(crate) fn clear(&mut self) -> bool {
+        if self.entries.is_empty() {
+            return false;
+        }
+
+        self.entries.clear();
+        true
+    }
+}
+
+pub(crate) fn load_recent_files() -> Result<RecentFiles, String> {
+    let path = recent_files_path()?;
+    let contents = match fs::read_to_string(&path) {
+        Ok(contents) => contents,
+        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(RecentFiles::default()),
+        Err(err) => {
+            return Err(format!("Failed to read {}: {err}", path.display()));
+        }
+    };
+
+    let mut recent_files = RecentFiles::default();
+    for line in contents
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .rev()
+    {
+        recent_files.add_path(Path::new(line));
+    }
+
+    Ok(recent_files)
+}
+
+pub(crate) fn store_recent_files(recent_files: &RecentFiles) -> Result<(), String> {
+    let path = recent_files_path()?;
+    let Some(parent) = path.parent() else {
+        return Err(format!(
+            "Recent files path has no parent: {}",
+            path.display()
+        ));
+    };
+
+    fs::create_dir_all(parent)
+        .map_err(|err| format!("Failed to create {}: {err}", parent.display()))?;
+
+    let mut contents = Vec::new();
+    for recent_path in &recent_files.entries {
+        writeln!(contents, "{}", recent_path.display())
+            .map_err(|err| format!("Failed to write {}: {err}", path.display()))?;
+    }
+
+    fs::write(&path, contents).map_err(|err| format!("Failed to write {}: {err}", path.display()))
+}
+
+fn recent_files_path() -> Result<PathBuf, String> {
+    Ok(app_data_directory()?.join(RECENT_FILES_NAME))
+}
+
+fn app_data_directory() -> Result<PathBuf, String> {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(base) = env::var_os("LOCALAPPDATA").or_else(|| env::var_os("APPDATA")) {
+            return Ok(PathBuf::from(base).join(APP_DIR_NAME));
+        }
+
+        return Err("Failed to resolve LOCALAPPDATA for app data".to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let Some(home) = env::var_os("HOME") else {
+            return Err("Failed to resolve HOME for app data".to_string());
+        };
+
+        return Ok(PathBuf::from(home)
+            .join("Library")
+            .join("Application Support")
+            .join(APP_DIR_NAME));
+    }
+
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        if let Some(base) = env::var_os("XDG_DATA_HOME") {
+            return Ok(PathBuf::from(base).join(APP_DIR_NAME));
+        }
+
+        let Some(home) = env::var_os("HOME") else {
+            return Err("Failed to resolve HOME for app data".to_string());
+        };
+
+        Ok(PathBuf::from(home)
+            .join(".local")
+            .join("share")
+            .join(APP_DIR_NAME))
+    }
+}
+
+fn same_path(left: &Path, right: &Path) -> bool {
+    save_target_path(left) == save_target_path(right)
+}
+
+fn save_target_path(path: &Path) -> PathBuf {
+    if path.exists() {
+        path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+    } else {
+        path.to_path_buf()
+    }
+}

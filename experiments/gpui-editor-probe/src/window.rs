@@ -4,9 +4,10 @@ use gpui_component::{
 };
 
 use crate::{
-    New, Open, Save, SaveAs,
+    ClearRecentFiles, New, Open, OpenRecent, Save, SaveAs,
     documents::{DocumentId, ProbeDocument, SAMPLE_MARKDOWN},
-    menus::install_app_menus,
+    menus::{install_app_menus, set_app_menus},
+    persistence::{RecentFiles, load_recent_files},
 };
 
 pub(crate) struct ProbeWindow {
@@ -14,13 +15,19 @@ pub(crate) struct ProbeWindow {
     pub(crate) active_document_id: Option<DocumentId>,
     pub(crate) next_document_id: DocumentId,
     pub(crate) app_menu_bar: Entity<AppMenuBar>,
+    pub(crate) recent_files: RecentFiles,
     pub(crate) status: SharedString,
     pub(crate) _subscriptions: Vec<Subscription>,
 }
 
 impl ProbeWindow {
     pub(crate) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        install_app_menus(cx);
+        let (recent_files, load_status) = match load_recent_files() {
+            Ok(recent_files) => (recent_files, None),
+            Err(err) => (RecentFiles::default(), Some(err.into())),
+        };
+
+        install_app_menus(cx, &recent_files);
         let app_menu_bar = AppMenuBar::new(cx);
         app_menu_bar.update(cx, |menu_bar, cx| menu_bar.reload(cx));
 
@@ -29,6 +36,7 @@ impl ProbeWindow {
             active_document_id: None,
             next_document_id: DocumentId::initial(),
             app_menu_bar,
+            recent_files,
             status: "Ready".into(),
             _subscriptions: Vec::new(),
         };
@@ -39,6 +47,9 @@ impl ProbeWindow {
             window,
             cx,
         );
+        if let Some(status) = load_status {
+            this.status = status;
+        }
         this
     }
 
@@ -66,6 +77,24 @@ impl ProbeWindow {
         if let Some(document_id) = self.active_document_id {
             self.prompt_save_as(document_id, window, cx);
         }
+    }
+
+    pub(crate) fn on_open_recent(
+        &mut self,
+        action: &OpenRecent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.open_document_path_from_disk(action.0.clone().into(), window, cx);
+    }
+
+    pub(crate) fn on_clear_recent_files(
+        &mut self,
+        _: &ClearRecentFiles,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.clear_recent_files(cx);
     }
 
     pub(crate) fn should_close_window(
@@ -108,6 +137,13 @@ impl ProbeWindow {
                     window.remove_window();
                     true
                 })
+        });
+    }
+
+    pub(crate) fn reload_app_menus(&self, cx: &mut Context<Self>) {
+        set_app_menus(cx, &self.recent_files);
+        self.app_menu_bar.update(cx, |menu_bar, cx| {
+            menu_bar.reload(cx);
         });
     }
 }
