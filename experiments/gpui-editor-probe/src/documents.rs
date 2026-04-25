@@ -13,7 +13,10 @@ use gpui_component::{
     input::{InputEvent, InputState},
 };
 
-use crate::{persistence::store_recent_files, window::ProbeWindow};
+use crate::{
+    persistence::{store_recent_files, write_file_atomic},
+    window::ProbeWindow,
+};
 
 pub(crate) const MAX_OPEN_TABS: usize = 5;
 
@@ -248,7 +251,7 @@ impl ProbeWindow {
             return;
         };
         let contents = self.documents[index].editor.read(cx).value().to_string();
-        match std::fs::write(path, contents.as_bytes()) {
+        match write_file_atomic(path, contents.as_bytes()) {
             Ok(()) => {
                 let document = &mut self.documents[index];
                 document.current_path = Some(path.to_path_buf());
@@ -295,7 +298,7 @@ impl ProbeWindow {
             let Some(path) = receiver.await.ok().and_then(Result::ok).flatten() else {
                 return;
             };
-            let result = std::fs::write(&path, &contents);
+            let result = write_file_atomic(&path, contents.as_bytes());
 
             _ = window.update(|_, cx| {
                 _ = view.update(cx, |this, cx| {

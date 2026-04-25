@@ -4,6 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use atomic_write_file::AtomicWriteFile;
+
 const APP_DIR_NAME: &str = "lazy-markdown";
 const RECENT_FILES_NAME: &str = "recent-files.txt";
 const MAX_RECENT_FILES: usize = 10;
@@ -87,7 +89,26 @@ pub(crate) fn store_recent_files(recent_files: &RecentFiles) -> Result<(), Strin
             .map_err(|err| format!("Failed to write {}: {err}", path.display()))?;
     }
 
-    fs::write(&path, contents).map_err(|err| format!("Failed to write {}: {err}", path.display()))
+    write_file_atomic(&path, &contents)
+}
+
+pub(crate) fn write_file_atomic(path: &Path, contents: &[u8]) -> Result<(), String> {
+    let file = AtomicWriteFile::open(path)
+        .map_err(|err| format!("Failed to write {}: {err}", path.display()))?;
+    let mut writer = std::io::BufWriter::new(file);
+
+    writer
+        .write_all(contents)
+        .map_err(|err| format!("Failed to write {}: {err}", path.display()))?;
+    writer
+        .flush()
+        .map_err(|err| format!("Failed to write {}: {err}", path.display()))?;
+
+    let file = writer
+        .into_inner()
+        .map_err(|err| format!("Failed to write {}: {}", path.display(), err.into_error()))?;
+    file.commit()
+        .map_err(|err| format!("Failed to write {}: {err}", path.display()))
 }
 
 fn recent_files_path() -> Result<PathBuf, String> {
