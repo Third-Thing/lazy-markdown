@@ -13,20 +13,57 @@ use crate::preferences::{
 
 const APP_DIR_NAME: &str = "lazy-markdown";
 const CONFIG_FILE_NAME: &str = "config.toml";
+const CUSTOM_THEME_FILE_NAME: &str = "theme.json";
 const RECENT_FILES_NAME: &str = "recent-files.txt";
 const MAX_RECENT_FILES: usize = 10;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum GpuiThemePreference {
+    DefaultLight,
+    DefaultDark,
+    Custom,
+}
+
+impl Default for GpuiThemePreference {
+    fn default() -> Self {
+        Self::DefaultLight
+    }
+}
+
+impl GpuiThemePreference {
+    pub(crate) fn config_value(self) -> &'static str {
+        match self {
+            Self::DefaultLight => "default_light",
+            Self::DefaultDark => "default_dark",
+            Self::Custom => "custom",
+        }
+    }
+
+    pub(crate) fn from_config_value(value: &str) -> Option<Self> {
+        match value {
+            "default_light" | "light" => Some(Self::DefaultLight),
+            "default_dark" | "dark" => Some(Self::DefaultDark),
+            "custom" => Some(Self::Custom),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AppConfig {
+    pub(crate) gpui_theme: GpuiThemePreference,
     pub(crate) editor_font: String,
     pub(crate) editor_font_size: usize,
+    main_theme_preference: Option<String>,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            gpui_theme: GpuiThemePreference::DefaultLight,
             editor_font: default_editor_font(),
             editor_font_size: default_editor_font_size(),
+            main_theme_preference: None,
         }
     }
 }
@@ -47,6 +84,17 @@ impl AppConfig {
             let value = value.trim().trim_matches('"');
 
             match key {
+                "theme" => {
+                    if !value.is_empty() {
+                        config.main_theme_preference = Some(value.to_string());
+                    }
+                }
+                "gpui_theme" => {
+                    let Some(theme) = GpuiThemePreference::from_config_value(value) else {
+                        return Err(format!("Invalid gpui_theme value: {value}"));
+                    };
+                    config.gpui_theme = theme;
+                }
                 "editor_font" => {
                     if value.is_empty() {
                         return Err("Invalid editor_font value: empty string".to_string());
@@ -67,11 +115,17 @@ impl AppConfig {
     }
 
     fn to_text(&self) -> String {
-        format!(
-            "# lazy-markdown user configuration\neditor_font = \"{}\"\neditor_font_size = {}\n",
+        let mut text = String::from("# lazy-markdown user configuration\n");
+        if let Some(theme) = &self.main_theme_preference {
+            text.push_str(&format!("theme = \"{theme}\"\n"));
+        }
+        text.push_str(&format!(
+            "gpui_theme = \"{}\"\neditor_font = \"{}\"\neditor_font_size = {}\n",
+            self.gpui_theme.config_value(),
             normalize_editor_font(&self.editor_font),
             normalize_editor_font_size(self.editor_font_size)
-        )
+        ));
+        text
     }
 }
 
@@ -158,6 +212,10 @@ pub(crate) fn store_app_config(config: &AppConfig) -> Result<(), String> {
         .map_err(|err| format!("Failed to create {}: {err}", parent.display()))?;
 
     write_file_atomic(&path, config.to_text().as_bytes())
+}
+
+pub(crate) fn custom_theme_path() -> Result<PathBuf, String> {
+    Ok(app_config_directory()?.join(CUSTOM_THEME_FILE_NAME))
 }
 
 pub(crate) fn store_recent_files(recent_files: &RecentFiles) -> Result<(), String> {
@@ -297,14 +355,16 @@ fn save_target_path(path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::AppConfig;
+    use super::{AppConfig, GpuiThemePreference};
     use crate::preferences::{MAX_EDITOR_FONT_SIZE, MONOSPACE_FONT, SYSTEM_DEFAULT_FONT};
 
     #[test]
     fn config_round_trip_keeps_editor_font_preferences() {
         let config = AppConfig {
+            gpui_theme: GpuiThemePreference::Custom,
             editor_font: MONOSPACE_FONT.to_string(),
             editor_font_size: 19,
+            main_theme_preference: Some("dark".to_string()),
         };
 
         assert_eq!(AppConfig::from_str(&config.to_text()).unwrap(), config);
@@ -317,5 +377,12 @@ mod tests {
 
         assert_eq!(config.editor_font, SYSTEM_DEFAULT_FONT);
         assert_eq!(config.editor_font_size, MAX_EDITOR_FONT_SIZE);
+    }
+
+    #[test]
+    fn config_accepts_gpui_theme_preferences() {
+        let config = AppConfig::from_str("gpui_theme = \"custom\"\n").unwrap();
+
+        assert_eq!(config.gpui_theme, GpuiThemePreference::Custom);
     }
 }

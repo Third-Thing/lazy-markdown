@@ -2,16 +2,21 @@ use gpui::{App, KeyBinding, Menu, MenuItem};
 use gpui_component::GlobalState;
 
 use crate::{
-    ClearRecentFiles, New, Open, OpenRecent, ResetFontSize, Save, SaveAs, SelectEditorFont, ZoomIn,
-    ZoomOut,
-    persistence::RecentFiles,
+    ClearRecentFiles, New, Open, OpenRecent, ResetFontSize, Save, SaveAs, SelectEditorFont,
+    SelectTheme, ZoomIn, ZoomOut,
+    persistence::{GpuiThemePreference, RecentFiles},
     preferences::{available_editor_fonts, editor_font_label},
 };
 
 const MAX_RECENT_LABEL_CHARS: usize = 52;
 const MAX_RECENT_NAME_CHARS: usize = 30;
 
-pub(crate) fn install_app_menus(cx: &mut App, recent_files: &RecentFiles, editor_font: &str) {
+pub(crate) fn install_app_menus(
+    cx: &mut App,
+    recent_files: &RecentFiles,
+    editor_font: &str,
+    theme_preference: GpuiThemePreference,
+) {
     cx.bind_keys([
         KeyBinding::new("ctrl-n", New, None),
         KeyBinding::new("ctrl-o", Open, None),
@@ -26,19 +31,28 @@ pub(crate) fn install_app_menus(cx: &mut App, recent_files: &RecentFiles, editor
         KeyBinding::new("ctrl-0", ResetFontSize, None),
     ]);
 
-    set_app_menus(cx, recent_files, editor_font);
+    set_app_menus(cx, recent_files, editor_font, theme_preference);
 }
 
-pub(crate) fn set_app_menus(cx: &mut App, recent_files: &RecentFiles, editor_font: &str) {
-    let owned_menus = build_app_menus(recent_files, editor_font)
+pub(crate) fn set_app_menus(
+    cx: &mut App,
+    recent_files: &RecentFiles,
+    editor_font: &str,
+    theme_preference: GpuiThemePreference,
+) {
+    let owned_menus = build_app_menus(recent_files, editor_font, theme_preference)
         .into_iter()
         .map(Menu::owned)
         .collect();
-    cx.set_menus(build_app_menus(recent_files, editor_font));
+    cx.set_menus(build_app_menus(recent_files, editor_font, theme_preference));
     GlobalState::global_mut(cx).set_app_menus(owned_menus);
 }
 
-fn build_app_menus(recent_files: &RecentFiles, editor_font: &str) -> Vec<Menu> {
+fn build_app_menus(
+    recent_files: &RecentFiles,
+    editor_font: &str,
+    theme_preference: GpuiThemePreference,
+) -> Vec<Menu> {
     vec![
         Menu {
             name: "File".into(),
@@ -58,10 +72,27 @@ fn build_app_menus(recent_files: &RecentFiles, editor_font: &str) -> Vec<Menu> {
             disabled: false,
         },
         Menu {
+            name: "Theme".into(),
+            items: theme_menu_items(theme_preference),
+            disabled: false,
+        },
+        Menu {
             name: "Font".into(),
             items: font_menu_items(editor_font),
             disabled: false,
         },
+    ]
+}
+
+fn theme_menu_items(theme_preference: GpuiThemePreference) -> Vec<MenuItem> {
+    vec![
+        MenuItem::action("Default Light", SelectTheme("light".to_string()))
+            .checked(theme_preference == GpuiThemePreference::DefaultLight),
+        MenuItem::action("Default Dark", SelectTheme("dark".to_string()))
+            .checked(theme_preference == GpuiThemePreference::DefaultDark),
+        MenuItem::separator(),
+        MenuItem::action("Custom Theme", SelectTheme("custom".to_string()))
+            .checked(theme_preference == GpuiThemePreference::Custom),
     ]
 }
 

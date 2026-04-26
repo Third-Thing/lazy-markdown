@@ -8,6 +8,7 @@ edition = "2024"
 anyhow = "1"
 atomic-write-file = { version = "0.3.0", features = ["unnamed-tmpfile"] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = [
     "font-kit",

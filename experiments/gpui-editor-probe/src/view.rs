@@ -1,6 +1,6 @@
 use gpui::{
     AnyElement, Context, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    Styled as _, Window, div, px, rgb,
+    Styled as _, Window, div, px,
 };
 use gpui_component::{
     ActiveTheme as _, IconName, Root, Sizable as _,
@@ -58,6 +58,7 @@ impl Render for ProbeWindow {
             .on_action(cx.listener(Self::on_open_recent))
             .on_action(cx.listener(Self::on_clear_recent_files))
             .on_action(cx.listener(Self::on_select_editor_font))
+            .on_action(cx.listener(Self::on_select_theme))
             .on_action(cx.listener(Self::on_zoom_in))
             .on_action(cx.listener(Self::on_zoom_out))
             .on_action(cx.listener(Self::on_reset_font_size))
@@ -99,7 +100,6 @@ impl Render for ProbeWindow {
                             .size_full()
                             .font_family(editor_font_family)
                             .text_size(editor_font_size)
-                            .bg(rgb(0xf7f7f7))
                             .into_any_element(),
                         None => div()
                             .size_full()

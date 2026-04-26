@@ -27,6 +27,10 @@ pub(crate) struct SelectEditorFont(pub(crate) String);
 
 #[derive(Action, Clone, PartialEq, Eq, Deserialize)]
 #[action(namespace = probe, no_json)]
+pub(crate) struct SelectTheme(pub(crate) String);
+
+#[derive(Action, Clone, PartialEq, Eq, Deserialize)]
+#[action(namespace = probe, no_json)]
 pub(crate) struct ClearRecentFiles;
 
 fn main() {

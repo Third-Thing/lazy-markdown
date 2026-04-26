@@ -1,14 +1,20 @@
+use std::{fs, rc::Rc};
+
 use gpui::{Context, Entity, SharedString, Subscription, Window};
 use gpui_component::{
-    WindowExt, button::ButtonVariant, dialog::DialogButtonProps, menu::AppMenuBar,
+    Theme, ThemeRegistry, ThemeSet, WindowExt, button::ButtonVariant, dialog::DialogButtonProps,
+    menu::AppMenuBar,
 };
 
 use crate::{
-    ClearRecentFiles, New, Open, OpenRecent, ResetFontSize, Save, SaveAs, SelectEditorFont, ZoomIn,
-    ZoomOut,
+    ClearRecentFiles, New, Open, OpenRecent, ResetFontSize, Save, SaveAs, SelectEditorFont,
+    SelectTheme, ZoomIn, ZoomOut,
     documents::{DocumentId, ProbeDocument, SAMPLE_MARKDOWN},
     menus::{install_app_menus, set_app_menus},
-    persistence::{AppConfig, RecentFiles, load_app_config, load_recent_files, store_app_config},
+    persistence::{
+        AppConfig, GpuiThemePreference, RecentFiles, custom_theme_path, load_app_config,
+        load_recent_files, store_app_config,
+    },
     preferences::{
         decrease_editor_font_size, default_editor_font_size, editor_font_label,
         increase_editor_font_size, normalize_editor_font, normalize_editor_font_size,
@@ -38,7 +44,13 @@ impl ProbeWindow {
             Err(err) => (AppConfig::default(), Some(err.into())),
         };
 
-        install_app_menus(cx, &recent_files, &app_config.editor_font);
+        let theme_status = apply_startup_theme(&app_config, window, cx).err();
+        install_app_menus(
+            cx,
+            &recent_files,
+            &app_config.editor_font,
+            app_config.gpui_theme,
+        );
         let app_menu_bar = AppMenuBar::new(cx);
         app_menu_bar.update(cx, |menu_bar, cx| menu_bar.reload(cx));
         let available_font_families = cx.text_system().all_font_names();
@@ -66,6 +78,9 @@ impl ProbeWindow {
         }
         if let Some(status) = config_status {
             this.status = status;
+        }
+        if let Some(status) = theme_status {
+            this.status = status.into();
         }
         this
     }
@@ -121,6 +136,32 @@ impl ProbeWindow {
         cx: &mut Context<Self>,
     ) {
         self.apply_editor_font(action.0.clone(), cx);
+    }
+
+    pub(crate) fn on_select_theme(
+        &mut self,
+        action: &SelectTheme,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(theme_preference) = GpuiThemePreference::from_config_value(&action.0) else {
+            self.status = format!("Unknown theme: {}", action.0).into();
+            cx.notify();
+            return;
+        };
+
+        match apply_theme_preference(theme_preference, window, cx) {
+            Ok(status) => {
+                self.app_config.gpui_theme = theme_preference;
+                self.status = status.into();
+                self.persist_app_config(cx);
+            }
+            Err(err) => {
+                self.status = err.into();
+            }
+        }
+        self.reload_app_menus(cx);
+        cx.notify();
     }
 
     pub(crate) fn on_zoom_in(&mut self, _: &ZoomIn, _: &mut Window, cx: &mut Context<Self>) {
@@ -186,7 +227,12 @@ impl ProbeWindow {
     }
 
     pub(crate) fn reload_app_menus(&self, cx: &mut Context<Self>) {
-        set_app_menus(cx, &self.recent_files, &self.app_config.editor_font);
+        set_app_menus(
+            cx,
+            &self.recent_files,
+            &self.app_config.editor_font,
+            self.app_config.gpui_theme,
+        );
         self.app_menu_bar.update(cx, |menu_bar, cx| {
             menu_bar.reload(cx);
         });
@@ -215,4 +261,52 @@ impl ProbeWindow {
             cx.notify();
         }
     }
+}
+
+fn apply_startup_theme(
+    config: &AppConfig,
+    window: &mut Window,
+    cx: &mut Context<ProbeWindow>,
+) -> Result<(), String> {
+    apply_theme_preference(config.gpui_theme, window, cx).map(|_| ())
+}
+
+fn apply_theme_preference(
+    theme_preference: GpuiThemePreference,
+    window: &mut Window,
+    cx: &mut Context<ProbeWindow>,
+) -> Result<String, String> {
+    match theme_preference {
+        GpuiThemePreference::DefaultLight => {
+            let theme_config = ThemeRegistry::global(cx).default_light_theme().clone();
+            Theme::global_mut(cx).apply_config(&theme_config);
+            window.refresh();
+            Ok("Theme set to Default Light".to_string())
+        }
+        GpuiThemePreference::DefaultDark => {
+            let theme_config = ThemeRegistry::global(cx).default_dark_theme().clone();
+            Theme::global_mut(cx).apply_config(&theme_config);
+            window.refresh();
+            Ok("Theme set to Default Dark".to_string())
+        }
+        GpuiThemePreference::Custom => apply_custom_theme(window, cx),
+    }
+}
+
+fn apply_custom_theme(
+    window: &mut Window,
+    cx: &mut Context<ProbeWindow>,
+) -> Result<String, String> {
+    let path = custom_theme_path()?;
+    let contents = fs::read_to_string(&path)
+        .map_err(|err| format!("Failed to read {}: {err}", path.display()))?;
+    let theme_set = serde_json::from_str::<ThemeSet>(&contents)
+        .map_err(|err| format!("Failed to parse {}: {err}", path.display()))?;
+    let Some(theme_config) = theme_set.themes.first() else {
+        return Err(format!("No themes found in {}", path.display()));
+    };
+
+    Theme::global_mut(cx).apply_config(&Rc::new(theme_config.clone()));
+    window.refresh();
+    Ok(format!("Custom theme loaded: {}", theme_config.name))
 }
