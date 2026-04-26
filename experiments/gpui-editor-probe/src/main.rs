@@ -6,16 +6,24 @@ use serde::Deserialize;
 mod documents;
 mod menus;
 mod persistence;
+mod preferences;
 mod view;
 mod window;
 
 use window::ProbeWindow;
 
-actions!(probe, [New, Open, Save, SaveAs]);
+actions!(
+    probe,
+    [New, Open, Save, SaveAs, ZoomIn, ZoomOut, ResetFontSize]
+);
 
 #[derive(Action, Clone, PartialEq, Eq, Deserialize)]
 #[action(namespace = probe, no_json)]
 pub(crate) struct OpenRecent(pub(crate) String);
+
+#[derive(Action, Clone, PartialEq, Eq, Deserialize)]
+#[action(namespace = probe, no_json)]
+pub(crate) struct SelectEditorFont(pub(crate) String);
 
 #[derive(Action, Clone, PartialEq, Eq, Deserialize)]
 #[action(namespace = probe, no_json)]

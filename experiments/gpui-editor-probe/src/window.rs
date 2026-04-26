@@ -4,10 +4,15 @@ use gpui_component::{
 };
 
 use crate::{
-    ClearRecentFiles, New, Open, OpenRecent, Save, SaveAs,
+    ClearRecentFiles, New, Open, OpenRecent, ResetFontSize, Save, SaveAs, SelectEditorFont, ZoomIn,
+    ZoomOut,
     documents::{DocumentId, ProbeDocument, SAMPLE_MARKDOWN},
     menus::{install_app_menus, set_app_menus},
-    persistence::{RecentFiles, load_recent_files},
+    persistence::{AppConfig, RecentFiles, load_app_config, load_recent_files, store_app_config},
+    preferences::{
+        decrease_editor_font_size, default_editor_font_size, editor_font_label,
+        increase_editor_font_size, normalize_editor_font, normalize_editor_font_size,
+    },
 };
 
 pub(crate) struct ProbeWindow {
@@ -16,6 +21,8 @@ pub(crate) struct ProbeWindow {
     pub(crate) next_document_id: DocumentId,
     pub(crate) app_menu_bar: Entity<AppMenuBar>,
     pub(crate) recent_files: RecentFiles,
+    pub(crate) app_config: AppConfig,
+    pub(crate) available_font_families: Vec<String>,
     pub(crate) status: SharedString,
     pub(crate) _subscriptions: Vec<Subscription>,
 }
@@ -26,10 +33,15 @@ impl ProbeWindow {
             Ok(recent_files) => (recent_files, None),
             Err(err) => (RecentFiles::default(), Some(err.into())),
         };
+        let (app_config, config_status) = match load_app_config() {
+            Ok(app_config) => (app_config, None),
+            Err(err) => (AppConfig::default(), Some(err.into())),
+        };
 
-        install_app_menus(cx, &recent_files);
+        install_app_menus(cx, &recent_files, &app_config.editor_font);
         let app_menu_bar = AppMenuBar::new(cx);
         app_menu_bar.update(cx, |menu_bar, cx| menu_bar.reload(cx));
+        let available_font_families = cx.text_system().all_font_names();
 
         let mut this = Self {
             documents: Vec::new(),
@@ -37,6 +49,8 @@ impl ProbeWindow {
             next_document_id: DocumentId::initial(),
             app_menu_bar,
             recent_files,
+            app_config,
+            available_font_families,
             status: "Ready".into(),
             _subscriptions: Vec::new(),
         };
@@ -48,6 +62,9 @@ impl ProbeWindow {
             cx,
         );
         if let Some(status) = load_status {
+            this.status = status;
+        }
+        if let Some(status) = config_status {
             this.status = status;
         }
         this
@@ -97,6 +114,34 @@ impl ProbeWindow {
         self.clear_recent_files(cx);
     }
 
+    pub(crate) fn on_select_editor_font(
+        &mut self,
+        action: &SelectEditorFont,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.apply_editor_font(action.0.clone(), cx);
+    }
+
+    pub(crate) fn on_zoom_in(&mut self, _: &ZoomIn, _: &mut Window, cx: &mut Context<Self>) {
+        let size = increase_editor_font_size(self.app_config.editor_font_size);
+        self.apply_editor_font_size(size, cx);
+    }
+
+    pub(crate) fn on_zoom_out(&mut self, _: &ZoomOut, _: &mut Window, cx: &mut Context<Self>) {
+        let size = decrease_editor_font_size(self.app_config.editor_font_size);
+        self.apply_editor_font_size(size, cx);
+    }
+
+    pub(crate) fn on_reset_font_size(
+        &mut self,
+        _: &ResetFontSize,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.apply_editor_font_size(default_editor_font_size(), cx);
+    }
+
     pub(crate) fn should_close_window(
         &mut self,
         window: &mut Window,
@@ -141,9 +186,33 @@ impl ProbeWindow {
     }
 
     pub(crate) fn reload_app_menus(&self, cx: &mut Context<Self>) {
-        set_app_menus(cx, &self.recent_files);
+        set_app_menus(cx, &self.recent_files, &self.app_config.editor_font);
         self.app_menu_bar.update(cx, |menu_bar, cx| {
             menu_bar.reload(cx);
         });
+    }
+
+    fn apply_editor_font(&mut self, font_family: String, cx: &mut Context<Self>) {
+        let font_family = normalize_editor_font(&font_family);
+        self.app_config.editor_font = font_family.clone();
+        self.status = format!("Editor font set to {}", editor_font_label(&font_family)).into();
+        self.persist_app_config(cx);
+        self.reload_app_menus(cx);
+        cx.notify();
+    }
+
+    fn apply_editor_font_size(&mut self, font_size: usize, cx: &mut Context<Self>) {
+        let font_size = normalize_editor_font_size(font_size);
+        self.app_config.editor_font_size = font_size;
+        self.status = format!("Editor font size set to {font_size}px").into();
+        self.persist_app_config(cx);
+        cx.notify();
+    }
+
+    fn persist_app_config(&mut self, cx: &mut Context<Self>) {
+        if let Err(err) = store_app_config(&self.app_config) {
+            self.status = err.into();
+            cx.notify();
+        }
     }
 }

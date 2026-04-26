@@ -1,6 +1,6 @@
 use gpui::{
     AnyElement, Context, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    Styled as _, Window, div, px,
+    Styled as _, Window, div, px, rgb,
 };
 use gpui_component::{
     ActiveTheme as _, IconName, Root, Sizable as _,
@@ -10,7 +10,7 @@ use gpui_component::{
     v_flex,
 };
 
-use crate::window::ProbeWindow;
+use crate::{preferences::editor_font_family, window::ProbeWindow};
 
 impl Render for ProbeWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -39,6 +39,12 @@ impl Render for ProbeWindow {
         });
         let active_editor = self.active_editor();
         let selected_index = self.active_index().unwrap_or(0);
+        let editor_font_family = editor_font_family(
+            &self.app_config.editor_font,
+            &self.available_font_families,
+            cx,
+        );
+        let editor_font_size = px(self.app_config.editor_font_size as f32);
 
         v_flex()
             .id("gpui-editor-probe")
@@ -51,6 +57,10 @@ impl Render for ProbeWindow {
             .on_action(cx.listener(Self::on_save_as))
             .on_action(cx.listener(Self::on_open_recent))
             .on_action(cx.listener(Self::on_clear_recent_files))
+            .on_action(cx.listener(Self::on_select_editor_font))
+            .on_action(cx.listener(Self::on_zoom_in))
+            .on_action(cx.listener(Self::on_zoom_out))
+            .on_action(cx.listener(Self::on_reset_font_size))
             .child(
                 div()
                     .w_full()
@@ -85,7 +95,12 @@ impl Render for ProbeWindow {
                     .px_3()
                     .pt_2()
                     .child(match active_editor {
-                        Some(editor) => Input::new(&editor).size_full().into_any_element(),
+                        Some(editor) => Input::new(&editor)
+                            .size_full()
+                            .font_family(editor_font_family)
+                            .text_size(editor_font_size)
+                            .bg(rgb(0xf7f7f7))
+                            .into_any_element(),
                         None => div()
                             .size_full()
                             .flex()

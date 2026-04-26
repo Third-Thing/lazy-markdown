@@ -1,32 +1,44 @@
 use gpui::{App, KeyBinding, Menu, MenuItem};
 use gpui_component::GlobalState;
 
-use crate::{ClearRecentFiles, New, Open, OpenRecent, Save, SaveAs, persistence::RecentFiles};
+use crate::{
+    ClearRecentFiles, New, Open, OpenRecent, ResetFontSize, Save, SaveAs, SelectEditorFont, ZoomIn,
+    ZoomOut,
+    persistence::RecentFiles,
+    preferences::{available_editor_fonts, editor_font_label},
+};
 
 const MAX_RECENT_LABEL_CHARS: usize = 52;
 const MAX_RECENT_NAME_CHARS: usize = 30;
 
-pub(crate) fn install_app_menus(cx: &mut App, recent_files: &RecentFiles) {
+pub(crate) fn install_app_menus(cx: &mut App, recent_files: &RecentFiles, editor_font: &str) {
     cx.bind_keys([
         KeyBinding::new("ctrl-n", New, None),
         KeyBinding::new("ctrl-o", Open, None),
         KeyBinding::new("ctrl-s", Save, None),
         KeyBinding::new("ctrl-shift-s", SaveAs, None),
+        KeyBinding::new("ctrl-=", ZoomIn, None),
+        KeyBinding::new("ctrl-+", ZoomIn, None),
+        KeyBinding::new("ctrl-shift-=", ZoomIn, None),
+        KeyBinding::new("ctrl-add", ZoomIn, None),
+        KeyBinding::new("ctrl--", ZoomOut, None),
+        KeyBinding::new("ctrl-subtract", ZoomOut, None),
+        KeyBinding::new("ctrl-0", ResetFontSize, None),
     ]);
 
-    set_app_menus(cx, recent_files);
+    set_app_menus(cx, recent_files, editor_font);
 }
 
-pub(crate) fn set_app_menus(cx: &mut App, recent_files: &RecentFiles) {
-    let owned_menus = build_app_menus(recent_files)
+pub(crate) fn set_app_menus(cx: &mut App, recent_files: &RecentFiles, editor_font: &str) {
+    let owned_menus = build_app_menus(recent_files, editor_font)
         .into_iter()
         .map(Menu::owned)
         .collect();
-    cx.set_menus(build_app_menus(recent_files));
+    cx.set_menus(build_app_menus(recent_files, editor_font));
     GlobalState::global_mut(cx).set_app_menus(owned_menus);
 }
 
-fn build_app_menus(recent_files: &RecentFiles) -> Vec<Menu> {
+fn build_app_menus(recent_files: &RecentFiles, editor_font: &str) -> Vec<Menu> {
     vec![
         Menu {
             name: "File".into(),
@@ -45,7 +57,22 @@ fn build_app_menus(recent_files: &RecentFiles) -> Vec<Menu> {
             items: recent_menu_items(recent_files),
             disabled: false,
         },
+        Menu {
+            name: "Font".into(),
+            items: font_menu_items(editor_font),
+            disabled: false,
+        },
     ]
+}
+
+fn font_menu_items(editor_font: &str) -> Vec<MenuItem> {
+    available_editor_fonts()
+        .into_iter()
+        .map(|font| {
+            MenuItem::action(editor_font_label(font), SelectEditorFont(font.to_string()))
+                .checked(font == editor_font)
+        })
+        .collect()
 }
 
 fn recent_menu_items(recent_files: &RecentFiles) -> Vec<MenuItem> {
