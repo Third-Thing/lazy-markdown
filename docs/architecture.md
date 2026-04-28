@@ -129,6 +129,11 @@ The font menu stores generic choices such as System Default, Serif, Monospace,
 Cursive, and Fantasy. At render time, generic families are resolved to the
 current GPUI theme font, mono font, or installed concrete font names.
 
+The editor render style sets an explicit normal font weight and a relative line
+height. GPUI Component's `Input` default line height is rem-based, so using a
+relative line height keeps vertical spacing tied to the selected editor font
+size when zooming.
+
 ## Themes
 
 The Theme menu supports:
