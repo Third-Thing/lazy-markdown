@@ -1,4 +1,4 @@
-use std::{fs, rc::Rc};
+use std::{fs, path::PathBuf, rc::Rc};
 
 use gpui::{Context, Entity, SharedString, Subscription, Window};
 use gpui_component::{
@@ -9,7 +9,7 @@ use gpui_component::{
 use crate::{
     ClearRecentFiles, New, Open, OpenRecent, ResetFontSize, Save, SaveAs, SelectEditorFont,
     SelectTheme, ZoomIn, ZoomOut,
-    documents::{DocumentId, ProbeDocument, SAMPLE_MARKDOWN},
+    documents::{Document, DocumentId},
     menus::{install_app_menus, set_app_menus},
     persistence::{
         AppConfig, GpuiThemePreference, RecentFiles, custom_theme_path, load_app_config,
@@ -21,8 +21,8 @@ use crate::{
     },
 };
 
-pub(crate) struct ProbeWindow {
-    pub(crate) documents: Vec<ProbeDocument>,
+pub(crate) struct AppWindow {
+    pub(crate) documents: Vec<Document>,
     pub(crate) active_document_id: Option<DocumentId>,
     pub(crate) next_document_id: DocumentId,
     pub(crate) app_menu_bar: Entity<AppMenuBar>,
@@ -33,8 +33,12 @@ pub(crate) struct ProbeWindow {
     pub(crate) _subscriptions: Vec<Subscription>,
 }
 
-impl ProbeWindow {
-    pub(crate) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+impl AppWindow {
+    pub(crate) fn new(
+        initial_path: Option<PathBuf>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let (recent_files, load_status) = match load_recent_files() {
             Ok(recent_files) => (recent_files, None),
             Err(err) => (RecentFiles::default(), Some(err.into())),
@@ -66,23 +70,61 @@ impl ProbeWindow {
             status: "Ready".into(),
             _subscriptions: Vec::new(),
         };
-        this.create_document(
-            None,
-            SAMPLE_MARKDOWN.to_string(),
-            "Opened the GPUI editor probe".into(),
-            window,
-            cx,
-        );
-        if let Some(status) = load_status {
-            this.status = status;
-        }
-        if let Some(status) = config_status {
-            this.status = status;
-        }
-        if let Some(status) = theme_status {
-            this.status = status.into();
+        let opened_startup_path = initial_path.is_some();
+        this.open_startup_document(initial_path, window, cx);
+        if !opened_startup_path {
+            if let Some(status) = load_status {
+                this.status = status;
+            }
+            if let Some(status) = config_status {
+                this.status = status;
+            }
+            if let Some(status) = theme_status {
+                this.status = status.into();
+            }
         }
         this
+    }
+
+    fn open_startup_document(
+        &mut self,
+        initial_path: Option<PathBuf>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(path) = initial_path else {
+            self.create_blank_startup_document(window, cx, "Ready".into());
+            return;
+        };
+
+        match fs::read_to_string(&path) {
+            Ok(contents) => {
+                self.create_document(
+                    Some(path.clone()),
+                    contents,
+                    format!("Opened {}", path.display()).into(),
+                    window,
+                    cx,
+                );
+                self.record_recent_file(&path, cx);
+            }
+            Err(err) => {
+                self.create_blank_startup_document(
+                    window,
+                    cx,
+                    format!("Failed to open {}: {err}", path.display()).into(),
+                );
+            }
+        }
+    }
+
+    fn create_blank_startup_document(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        status: SharedString,
+    ) {
+        self.create_document(None, String::new(), status, window, cx);
     }
 
     pub(crate) fn on_new(&mut self, _: &New, window: &mut Window, cx: &mut Context<Self>) {
@@ -204,7 +246,7 @@ impl ProbeWindow {
     fn open_close_window_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let document_name = self
             .active_document()
-            .map(ProbeDocument::saved_title)
+            .map(Document::saved_title)
             .unwrap_or_else(|| "Untitled".to_string());
         let description = format!("{document_name} has unsaved changes. Close without saving?");
 
@@ -266,7 +308,7 @@ impl ProbeWindow {
 fn apply_startup_theme(
     config: &AppConfig,
     window: &mut Window,
-    cx: &mut Context<ProbeWindow>,
+    cx: &mut Context<AppWindow>,
 ) -> Result<(), String> {
     apply_theme_preference(config.gpui_theme, window, cx).map(|_| ())
 }
@@ -274,7 +316,7 @@ fn apply_startup_theme(
 fn apply_theme_preference(
     theme_preference: GpuiThemePreference,
     window: &mut Window,
-    cx: &mut Context<ProbeWindow>,
+    cx: &mut Context<AppWindow>,
 ) -> Result<String, String> {
     match theme_preference {
         GpuiThemePreference::DefaultLight => {
@@ -293,10 +335,7 @@ fn apply_theme_preference(
     }
 }
 
-fn apply_custom_theme(
-    window: &mut Window,
-    cx: &mut Context<ProbeWindow>,
-) -> Result<String, String> {
+fn apply_custom_theme(window: &mut Window, cx: &mut Context<AppWindow>) -> Result<String, String> {
     let path = custom_theme_path()?;
     let contents = fs::read_to_string(&path)
         .map_err(|err| format!("Failed to read {}: {err}", path.display()))?;

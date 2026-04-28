@@ -10,9 +10,9 @@ use gpui_component::{
     v_flex,
 };
 
-use crate::{preferences::editor_font_family, window::ProbeWindow};
+use crate::{preferences::editor_font_family, window::AppWindow};
 
-impl Render for ProbeWindow {
+impl Render for AppWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let dialog_layer = Root::render_dialog_layer(window, cx);
         let view = cx.entity();
@@ -47,7 +47,7 @@ impl Render for ProbeWindow {
         let editor_font_size = px(self.app_config.editor_font_size as f32);
 
         v_flex()
-            .id("gpui-editor-probe")
+            .id("lazy-markdown-gpui")
             .size_full()
             .relative()
             .bg(cx.theme().background)

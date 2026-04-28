@@ -3207,7 +3207,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "lazy-markdown-gpui-editor-probe"
+name = "lazy-markdown-gpui"
 version = "0.0.0"
 dependencies = [
  "anyhow",

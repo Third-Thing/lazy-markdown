@@ -15,19 +15,10 @@ use gpui_component::{
 
 use crate::{
     persistence::{store_recent_files, write_file_atomic},
-    window::ProbeWindow,
+    window::AppWindow,
 };
 
 pub(crate) const MAX_OPEN_TABS: usize = 5;
-
-pub(crate) const SAMPLE_MARKDOWN: &str = r#"# lazy-markdown GPUI probe
-
-This standalone crate opens GPUI Component multiline text editors in tabs.
-
-- Type here
-- Try selection and paste
-- Use this to validate editor behavior before converting the main app
-"#;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct DocumentId(pub(crate) u64);
@@ -42,7 +33,7 @@ impl DocumentId {
     }
 }
 
-pub(crate) struct ProbeDocument {
+pub(crate) struct Document {
     pub(crate) id: DocumentId,
     pub(crate) editor: Entity<InputState>,
     pub(crate) current_path: Option<PathBuf>,
@@ -50,7 +41,7 @@ pub(crate) struct ProbeDocument {
     pub(crate) dirty: bool,
 }
 
-impl ProbeDocument {
+impl Document {
     pub(crate) fn title(&self) -> SharedString {
         let marker = if self.dirty { " *" } else { "" };
         format!("{}{marker}", self.saved_title()).into()
@@ -78,7 +69,7 @@ pub(crate) fn document_status(value: &str, dirty: bool) -> SharedString {
     .into()
 }
 
-impl ProbeWindow {
+impl AppWindow {
     pub(crate) fn allocate_document_id(&mut self) -> DocumentId {
         let id = self.next_document_id;
         self.next_document_id = self.next_document_id.next();
@@ -114,7 +105,7 @@ impl ProbeWindow {
         });
 
         self._subscriptions.push(subscription);
-        self.documents.push(ProbeDocument {
+        self.documents.push(Document {
             id,
             editor,
             current_path,
@@ -326,7 +317,7 @@ impl ProbeWindow {
         .detach();
     }
 
-    fn record_recent_file(&mut self, path: &Path, cx: &mut Context<Self>) -> bool {
+    pub(crate) fn record_recent_file(&mut self, path: &Path, cx: &mut Context<Self>) -> bool {
         if !self.recent_files.add_path(path) {
             return true;
         }
@@ -397,7 +388,7 @@ impl ProbeWindow {
     ) {
         let title = self
             .document_by_id(document_id)
-            .map(ProbeDocument::saved_title)
+            .map(Document::saved_title)
             .unwrap_or_else(|| "Untitled".to_string());
         let description = format!("{title} has unsaved changes. Close without saving?");
         let view = cx.entity();
@@ -555,7 +546,7 @@ impl ProbeWindow {
         self.document_index(active_document_id)
     }
 
-    pub(crate) fn active_document(&self) -> Option<&ProbeDocument> {
+    pub(crate) fn active_document(&self) -> Option<&Document> {
         self.active_document_id
             .and_then(|document_id| self.document_by_id(document_id))
     }
@@ -565,7 +556,7 @@ impl ProbeWindow {
             .map(|document| document.editor.clone())
     }
 
-    pub(crate) fn document_by_id(&self, document_id: DocumentId) -> Option<&ProbeDocument> {
+    pub(crate) fn document_by_id(&self, document_id: DocumentId) -> Option<&Document> {
         self.documents
             .iter()
             .find(|document| document.id == document_id)

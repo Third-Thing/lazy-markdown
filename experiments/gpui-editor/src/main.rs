@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use gpui::{Action, App, AppContext as _, WindowBounds, WindowOptions, actions, px, size};
 use gpui_component::Root;
 use gpui_component_assets::Assets;
@@ -10,31 +12,32 @@ mod preferences;
 mod view;
 mod window;
 
-use window::ProbeWindow;
+use window::AppWindow;
 
 actions!(
-    probe,
+    lazy_markdown,
     [New, Open, Save, SaveAs, ZoomIn, ZoomOut, ResetFontSize]
 );
 
 #[derive(Action, Clone, PartialEq, Eq, Deserialize)]
-#[action(namespace = probe, no_json)]
+#[action(namespace = lazy_markdown, no_json)]
 pub(crate) struct OpenRecent(pub(crate) String);
 
 #[derive(Action, Clone, PartialEq, Eq, Deserialize)]
-#[action(namespace = probe, no_json)]
+#[action(namespace = lazy_markdown, no_json)]
 pub(crate) struct SelectEditorFont(pub(crate) String);
 
 #[derive(Action, Clone, PartialEq, Eq, Deserialize)]
-#[action(namespace = probe, no_json)]
+#[action(namespace = lazy_markdown, no_json)]
 pub(crate) struct SelectTheme(pub(crate) String);
 
 #[derive(Action, Clone, PartialEq, Eq, Deserialize)]
-#[action(namespace = probe, no_json)]
+#[action(namespace = lazy_markdown, no_json)]
 pub(crate) struct ClearRecentFiles;
 
 fn main() {
     let app = gpui_platform::application().with_assets(Assets);
+    let initial_path = std::env::args().nth(1).map(PathBuf::from);
 
     app.run(move |cx: &mut App| {
         gpui_component::init(cx);
@@ -47,7 +50,7 @@ fn main() {
 
         cx.spawn(async move |cx| {
             cx.open_window(window_options, |window, cx| {
-                let view = cx.new(|cx| ProbeWindow::new(window, cx));
+                let view = cx.new(|cx| AppWindow::new(initial_path.clone(), window, cx));
                 window.on_window_should_close(cx, {
                     let view = view.clone();
                     move |window, cx| {
@@ -56,7 +59,7 @@ fn main() {
                 });
                 cx.new(|cx| Root::new(view, window, cx))
             })
-            .expect("open GPUI editor probe window");
+            .expect("open GPUI editor window");
         })
         .detach();
     });
