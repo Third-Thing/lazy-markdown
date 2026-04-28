@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use gpui::{Action, App, AppContext as _, WindowBounds, WindowOptions, actions, px, size};
-use gpui_component::Root;
+use gpui_component::{Root, Theme, scroll::ScrollbarShow};
 use gpui_component_assets::Assets;
 use serde::Deserialize;
 
@@ -41,6 +41,7 @@ fn main() {
 
     app.run(move |cx: &mut App| {
         gpui_component::init(cx);
+        Theme::global_mut(cx).scrollbar_show = ScrollbarShow::Always;
 
         let window_options = WindowOptions {
             window_bounds: Some(WindowBounds::centered(size(px(900.), px(650.)), cx)),

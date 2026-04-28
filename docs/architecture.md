@@ -65,10 +65,11 @@ Startup happens in `src/main.rs`:
 
 1. create a GPUI platform application with bundled GPUI Component assets
 2. initialize GPUI Component
-3. create the window with the `lazy-markdown` app ID and embedded icon image
-4. create `AppWindow`
-5. wrap it in `Root`
-6. install window-close interception
+3. force GPUI Component scrollbars to stay visible
+4. create the window with the `lazy-markdown` app ID and embedded icon image
+5. create `AppWindow`
+6. wrap it in `Root`
+7. install window-close interception
 
 `AppWindow::new` loads recent files and app config, applies the startup theme,
 installs app menus, creates the menu bar entity, and opens the startup
