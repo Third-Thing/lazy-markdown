@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Lazy Markdown
+GenericName=Text Editor
+Comment=The laziest, most efficient markdown editor
+Exec=lazy-markdown %f
+Icon=lazy-markdown
+Terminal=false
+Categories=Utility;TextEditor;
+MimeType=text/markdown;text/plain;
+Keywords=Markdown;Editor;Text;
+StartupNotify=true

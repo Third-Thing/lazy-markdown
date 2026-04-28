@@ -27,6 +27,7 @@ The crate is split by feature and support role:
 - `src/menus.rs` installs key bindings and builds the GPUI app menu model.
 - `src/preferences.rs` holds editor font family and size helpers.
 - `src/persistence.rs` holds config, custom theme, recent-file storage, storage paths, and atomic write helpers.
+- `pkg/` holds Linux package assets, currently the desktop file and hicolor icon used by `cargo-generate-rpm` and the window icon.
 
 Feature modules keep focused `#[cfg(test)]` coverage nearby.
 
@@ -64,7 +65,7 @@ Startup happens in `src/main.rs`:
 
 1. create a GPUI platform application with bundled GPUI Component assets
 2. initialize GPUI Component
-3. create the window
+3. create the window with the `lazy-markdown` app ID and embedded icon image
 4. create `AppWindow`
 5. wrap it in `Root`
 6. install window-close interception

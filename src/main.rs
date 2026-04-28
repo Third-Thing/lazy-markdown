@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 use gpui::{Action, App, AppContext as _, WindowBounds, WindowOptions, actions, px, size};
 use gpui_component::Root;
@@ -45,6 +45,8 @@ fn main() {
         let window_options = WindowOptions {
             window_bounds: Some(WindowBounds::centered(size(px(900.), px(650.)), cx)),
             titlebar: None,
+            app_id: Some("lazy-markdown".into()),
+            icon: load_window_icon(),
             ..Default::default()
         };
 
@@ -63,4 +65,15 @@ fn main() {
         })
         .detach();
     });
+}
+
+fn load_window_icon() -> Option<Arc<image::RgbaImage>> {
+    let bytes = include_bytes!("../pkg/lazy-markdown-icon-256.png");
+    match image::load_from_memory_with_format(bytes, image::ImageFormat::Png) {
+        Ok(image) => Some(Arc::new(image.into_rgba8())),
+        Err(err) => {
+            eprintln!("Failed to load window icon: {err}");
+            None
+        }
+    }
 }
