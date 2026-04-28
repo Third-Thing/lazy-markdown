@@ -174,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    fn editor_font_size_defaults_to_floem_default() {
+    fn editor_font_size_defaults_to_app_default() {
         assert_eq!(default_editor_font_size(), 16);
     }
 

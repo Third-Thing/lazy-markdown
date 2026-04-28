@@ -27,25 +27,20 @@ It is not interested in features such as:
 
 ## Status
 
-This is currently a plain text tabbed editor. The implementation strategy is to build a robust plain text editor first, then add markdown-aware editing features that improve source editing directly.
-
-It currently relies on [a fork of floem](https://github.com/Third-Thing/floem/tree/dirty-tracking-and-stale-cursor-crash-fix) for proper dirty state tracking and a few crash fixes, while waiting for the [PRs](https://github.com/lapce/floem/pulls) to get merged.
-
-The repo also tracks concrete Floem friction found in real app code in [docs/floem-pain-points.md](docs/floem-pain-points.md).
+This is currently a GPUI Component plain text tabbed editor. The implementation
+strategy is to build a robust plain text editor first, then add markdown-aware
+editing features that improve source editing directly.
 
 This program is only tested on Linux/Wayland.
 
 ### Current Features
 
-- floem's built-in undo/redo
-- floem's built-in save/open dialogs
-- floem's built-in gutter (line numbers)
 - tabs with per-tab dirty state
 - menu actions and hotkeys for new/save/save-as/open
 - editor font family picker with per-user persistence
 - standard zoom hotkeys for editor font size: `Ctrl+=`, `Ctrl+-`, `Ctrl+0`
 - recent documents menu with per-user persistence
-- custom save or discard on tab/window close overlay
+- save or discard dialogs on tab/window close
 - atomic writing
 - dark/light theme options
 

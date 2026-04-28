@@ -1,273 +1,155 @@
 # Architecture
 
-`lazy-markdown` is a small Floem desktop application.
+`lazy-markdown` is a small GPUI Component desktop application.
 
-It is a plain text editor first, with markdown-aware structure tools as the intended direction. It is not aiming to become an in-app markdown renderer or preview application.
-
-The project is intentionally not trying to hide its GUI toolkit. The app keeps Floem-native state, Floem-native editor objects, and Floem-native event flow close to the features that use them. That makes the repo more useful as:
-
-- a practical reference for structuring a real Floem app
-- a place to record where Floem works well
-- a place to record where Floem still makes normal desktop behavior awkward
-
-For the current list of toolkit-specific rough edges, see [floem-pain-points.md](./floem-pain-points.md).
+It is a plain text editor first, with markdown-aware structure tools as the
+intended direction. It is not aiming to become an in-app markdown renderer or
+preview application.
 
 ## Design Goals
 
 The architecture is shaped by a few simple rules:
 
-- Prefer the clearest Floem-native design over toolkit-neutral abstraction.
 - Improve editing of source text directly rather than building duplicate rendered views.
 - Keep app logic close to the UI workflows that trigger it.
 - Use a small number of central state types instead of spreading behavior across many layers.
 - Keep persistence and file helpers thin.
-- Let the repo expose real Floem friction instead of hiding it behind wrapper code.
+- Use GPUI Component directly instead of hiding it behind a toolkit-neutral layer.
 
 ## Project Layout
 
 The crate is split by feature and support role:
 
-- `src/main.rs` builds the window, top-level view tree, and app-level event hooks.
-- `src/bootstrap.rs` loads startup data before the Floem window opens.
-- `src/commands.rs` defines command metadata and built-in command dispatch used by menus and shortcuts.
-- `src/workspace/mod.rs` groups document, frame, tab, editor-area, and workspace state code under one feature area.
-- `src/workspace/state.rs` holds the core app state, document state, tab state, menu state, and the active dialog signal.
-- `src/dialogs/mod.rs` groups dialog state and exports the dialog entry points.
-- `src/dialogs/confirm.rs` contains the shared dialog overlay UI for confirm and message cases.
-- `src/workspace/documents.rs` owns document lifecycle, file open/save flows, tab activation, and close flows.
-- `src/workspace/frame.rs` contains the main workspace frame composition: top bar, tab strip, editor area, and status strip.
-- `src/workspace/editor_area.rs` contains the active editor-area view, editor pointer handling, and the editor context menu overlay wiring.
-- `src/workspace/tabs.rs` contains the tab strip UI.
-- `src/menus/mod.rs` groups the app menu setup and re-exports the public menu entry points.
-- `src/menus/model.rs` holds menu item and menu model types that are shared by menu UI and menu key handling.
-- `src/menus/view.rs` contains the Floem menu bar and popup UI.
-- `src/menus/keys.rs` handles app-level menu capture, popup navigation keys, and menu activation.
-- `src/shortcuts.rs` handles command shortcut matching when the menu system does not consume the keypress.
-- `src/persistence/` holds config loading, recent-file storage, and per-platform storage paths.
-- `src/preferences/` holds app theme behavior and editor font preferences.
+- `src/main.rs` owns GPUI startup, window creation, and shared action types.
+- `src/window.rs` owns top-level window state, action handlers, runtime theme switching, and window-close handling.
+- `src/view.rs` owns the main GPUI render tree.
+- `src/documents.rs` owns document IDs, per-document state, file open/save flows, tab activation, dirty tracking, and close confirmation.
+- `src/menus.rs` installs key bindings and builds the GPUI app menu model.
+- `src/preferences.rs` holds editor font family and size helpers.
+- `src/persistence.rs` holds config, custom theme, recent-file storage, storage paths, and atomic write helpers.
 
-Experimental code that is not part of the shipped Floem app lives under `experiments/`.
-`experiments/gpui-editor-probe/` is a standalone GPUI Component crate used to evaluate
-the editor component, app menu bar, file-dialog flows, and dirty-document confirmation
-dialogs, including window-close interception, before any conversion work touches the main
-application.
-
-Feature modules also keep their own focused `#[cfg(test)]` coverage nearby. The current test layout favors headless interaction tests in the same modules as the menu, tab, document, command, and preference flows they exercise.
+Feature modules keep focused `#[cfg(test)]` coverage nearby.
 
 ## Runtime Shape
 
-The app is built around one Floem window with a small set of app-owned surfaces:
+The app is built around one GPUI window wrapped in `gpui_component::Root`.
+The visible app surface has:
 
-1. a top bar with the menu bar
-2. a tab strip
-3. the active editor area
+1. a top app menu bar
+2. a document tab strip
+3. the active multiline editor
 4. a status strip
-5. a dialog overlay for save/discard and message dialogs
+5. the GPUI Component dialog layer
 
-The same `AppState` instance is shared across those surfaces. Floem signals and effects keep the UI in sync with:
+`AppWindow` is the central state object. It stores the document list, active
+document ID, recent files, app config, available font families, status text,
+menu bar entity, and GPUI subscriptions.
 
-- the active document
-- dirty and pristine status
-- menu open state and selection state
-- recent files
-- theme preference
-- editor font family and size
-- status messages
-- the active dialog, when one is open
+Each `Document` owns:
 
-This is intentionally a Floem app with support modules, not a generic editor core with a Floem shell.
+- a stable `DocumentId`
+- a GPUI Component `InputState`
+- an optional current file path
+- a pristine text snapshot
+- a dirty flag
 
-## Core State
-
-Three state types carry most of the runtime model.
-
-- `DocumentState` stores a stable `DocumentId`, an optional file path signal, and a Floem `Editor`.
-- `DocumentSet` stores the open tabs, the active document ID, and the next document ID to allocate.
-- `AppState` stores the document set plus window-level state such as menu state, popup IDs, recent files, the active dialog, dialog guards, config, and theme state.
-
-This is an important architectural choice: document state owns Floem editor objects directly. The app does not try to wrap the editor in a toolkit-neutral model.
-
-That keeps flows such as dirty tracking, focus, editor styling, and view creation simple, but it also means the architecture follows Floem's strengths and limits closely. The pain-points doc exists partly because of that directness.
+The editor surface uses plain multiline `InputState`, not code-editor mode.
+That keeps the app focused on source text editing without syntax coloring,
+line numbers, or language-aware editor commands until those features are
+intentional.
 
 ## Startup
 
-Startup happens in two stages.
+Startup happens in `src/main.rs`:
 
-First, `AppBootstrap::load`:
+1. create a GPUI platform application with bundled GPUI Component assets
+2. initialize GPUI Component
+3. create the window
+4. create `AppWindow`
+5. wrap it in `Root`
+6. install window-close interception
 
-1. creates a module registry
-2. registers built-in commands
-3. loads `AppConfig`, falling back to defaults if config loading fails
+`AppWindow::new` loads recent files and app config, applies the startup theme,
+installs app menus, creates the menu bar entity, and opens the startup
+document.
 
-Second, `app_view` in `src/main.rs`:
+If the first CLI argument is a file path, the app reads that path into the
+initial tab and records it in recent files. If no path is provided, it starts
+with a blank untitled document. If the path cannot be read, it still starts
+with a blank untitled document and shows the failure in the status strip.
 
-1. loads the recent file list
-2. creates `AppState` with the current Floem scope, recent files, and config
-3. syncs the starting theme from the saved preference and current window theme
-4. opens the first CLI argument as the initial document if one was provided
-5. otherwise creates a blank untitled document
-6. records an opened startup path in recent files
-7. builds the full view tree and attaches app-level event handlers
+## Documents And Tabs
 
-Config and recent-file load failures are shown in the status strip instead of aborting startup.
+Document operations live in `src/documents.rs`.
 
-## Floem-Native Workflows
+- `New` creates and activates a fresh untitled tab.
+- `Open` opens a file dialog, reads the selected file, and records it in recent files.
+- Opening a path that is already open activates the existing tab instead of opening a duplicate.
+- `Save` writes the active document to its current path or falls through to Save As for untitled documents.
+- `Save As` opens a save dialog and writes through `atomic-write-file`.
+- Closing a dirty tab opens a discard confirmation dialog.
+- Closing the final clean tab clears it back to a blank untitled document.
+- Opening or creating more than five tabs shows a tab-limit dialog.
 
-Several important workflows are deliberately handled in the view-and-state layer rather than being pushed behind abstraction boundaries.
+Dirty tracking compares the current editor value with the document's pristine
+text snapshot. Saves update the snapshot and clear the dirty flag.
 
-### Menus and keyboard routing
+## Menus And Actions
 
-The menu system is app-owned UI built under `src/menus/`.
+GPUI actions are defined in `src/main.rs` and handled by listeners attached in
+`src/view.rs`.
 
-The app currently has four top-level menus:
+The app installs these key bindings:
 
-- File
-- Recent
-- Theme
-- Font
+- `Ctrl+N` for New
+- `Ctrl+O` for Open
+- `Ctrl+S` for Save
+- `Ctrl+Shift+S` for Save As
+- `Ctrl+=`, `Ctrl++`, `Ctrl+Shift+=`, and `Ctrl+Add` for zoom in
+- `Ctrl+-` and `Ctrl+Subtract` for zoom out
+- `Ctrl+0` for reset font size
 
-Keyboard routing is split across:
+The menu bar uses GPUI's app menu model plus `gpui_component::menu::AppMenuBar`.
+The app rebuilds menus after recent-file, theme, and font changes so visible
+menu state follows persisted state.
 
-- `src/menus/keys.rs` for app-level capture, top-level menu shortcuts, and popup navigation keys
-- `src/menus/view.rs` for the Floem menu bar and popup surfaces
-- `src/shortcuts.rs` for command shortcut matching when normal app content has focus
+## Preferences And Persistence
 
-This split is part of the real Floem story of the app. Overlay behavior, focus, and routing details matter here, and the code keeps that visible rather than hiding it behind a generic event layer.
+User data is stored under the app's platform config and data directories.
 
-The current `menus/` layout also keeps one likely future contribution path visible: the reusable parts are the menu model, popup behavior, and keyboard routing, while the actual menu contents are still app-owned. That keeps Linux-specific focus and keyboard behavior easy to inspect instead of burying it in a general wrapper.
+- `config.toml` stores GPUI theme choice, editor font family, and editor font size.
+- `theme.json` can provide a custom GPUI Component theme.
+- `recent-files.txt` stores the recent file list.
 
-### Tabs and editor focus
+Writes use `atomic-write-file` for documents, config, and recent files.
 
-Each tab owns a Floem `Editor`. Activating a tab updates app state first and then syncs focus in the rendered editor view once the matching editor view ID exists.
+The font menu stores generic choices such as System Default, Serif, Monospace,
+Cursive, and Fantasy. At render time, generic families are resolved to the
+current GPUI theme font, mono font, or installed concrete font names.
 
-That is more direct than introducing a separate focus manager abstraction, and it reflects how Floem view creation and focus targets actually behave.
+## Themes
 
-The editor context menu follows the same direct approach. Right-click actions such as copy, cut, and paste are still dispatched as Floem editor commands straight to the stored `Editor` for the active tab instead of going through the app-level command registry, but the menu surface itself is app-owned.
+The Theme menu supports:
 
-That split is deliberate. Floem's built-in Linux context menu path crashed under repeated right-click interaction in this app, so `lazy-markdown` opens its own small overlay menu instead of relying on Floem's native context menu helper there.
+- Default Light
+- Default Dark
+- Custom Theme
 
-The editor-area code also keeps a small local copy of Floem's editor-content pointer wiring. That workaround is needed because Floem's stock editor handler currently checks whether the pointer device is primary instead of whether the pressed button is primary, which lets mouse right-clicks fall into the normal left-click selection path.
+Default themes are applied from `ThemeRegistry`. Custom themes are read from
+`theme.json`, parsed as a GPUI Component `ThemeSet`, and applied at runtime.
 
-When the editor already has a selection, the app keeps that selection on right-click only if the click lands inside that selection so paste can replace it. If the click lands outside the current selection, the app moves the caret to the clicked position first.
+## Dialogs
 
-The overlay anchor converts the editor-content local pointer position back into window coordinates before placing the menu. Floem delivers pointer locations in the local space of the receiving view, so app-owned overlays need that conversion to land at the actual cursor position.
+The app uses GPUI Component dialogs for:
 
-The editor content view is placed directly in its `Scroll` parent without `position: absolute`, and the `Scroll` itself carries a small right-side padding so Floem's overlaid vertical scrollbar does not cover the last character. Floem's default editor content helper styles the editor view absolute, which would make any padding on a wrapper invisible to the absolute child; dropping that positioning is what lets the scroll's padding actually reserve space.
+- dirty tab close confirmation
+- dirty window close confirmation
+- tab-limit messages
 
-Because this editor-content wrapper is app-owned, upstream fixes in Floem's stock `ensure_visible` path do not automatically land here. The local wrapper now eagerly materializes text layouts up to the caret line before calling `vline_of_rvline` so wrapped paragraphs are counted correctly after cache invalidation, but that also means future upstream editor-scroll fixes still need to be ported deliberately.
+`Root::render_dialog_layer` is part of the render tree in `src/view.rs`; without
+that layer, dialog state would open but not appear.
 
-### Close confirmation
-
-The dialog overlay is one reusable Floem surface that handles:
-
-- closing a dirty tab
-- closing a window with dirty documents
-- simple app message dialogs such as the tab-limit warning
-
-The current dialog is tracked through one `active_dialog` signal, and the overlay reads that single source of truth to decide its title, message, buttons, and follow-up behavior.
-
-### Theme and editor styling
-
-The app uses Floem's window theme switching for light, dark, and follow-OS behavior, but it also keeps an app-owned theme layer for custom chrome such as:
-
-- the top bar
-- menu buttons and popups
-- tab strip
-- status strip
-- dialog shell
-
-Editor font family and size are also app-owned preferences. When they change, the app updates the styling of every open editor directly.
-
-That code now lives under `src/preferences/`:
-
-- `theme.rs` handles theme preference state, window-theme syncing, and editor theme styling
-- `editor_font.rs` handles editor font options, size changes, and editor restyling
-
-## Commands
-
-Commands exist to support menus, shortcuts, and future command-oriented UI such as a palette. They are shared app metadata plus a small execution helper, not a separate subsystem.
-
-The built-in commands are:
-
-- `file.new`
-- `file.open`
-- `file.save`
-- `file.save_as`
-- `view.zoom_in`
-- `view.zoom_out`
-- `view.zoom_reset`
-
-Each command has:
-
-- a stable ID
-- a title
-- default shortcuts
-- placement hints such as `Menu` or `Palette`
-
-The command registry helps the app avoid duplicating labels and shortcut definitions across menus and keyboard handling. `src/commands.rs` also includes the small `run_command` helper used by menus, shortcuts, and save-confirm dialog actions.
-
-That is intentionally narrow. The app does not have a command host layer or a plugin-style command pipeline. Command execution still stays close to the Floem app state and document flows, which is the right tradeoff for this repo's goals.
-
-## Document and Save Flow
-
-`src/workspace/documents.rs` owns document lifecycle.
-
-`file.new` creates a fresh untitled tab. `file.open` opens a Floem file dialog, reads the selected file into a new tab, and records the path in recent files. If the selected path is already open, the app activates that existing tab instead of opening a duplicate.
-
-The app currently enforces a hard cap of five open tabs. If the user tries to open more, the app shows a modal message through the same dialog overlay system.
-
-Saving is also handled directly in `src/workspace/documents.rs`.
-
-When `file.save` runs:
-
-- if the active document already has a path, the app saves straight to that path
-- if it does not, the app opens a Save As dialog first
-
-The actual write path is:
-
-1. resolve the destination path
-2. open an atomic temp file
-3. stream the editor rope into a buffered writer chunk by chunk
-4. flush the writer
-5. commit the temp file over the destination
-6. mark the document pristine
-7. update the document path, recent files, and status message
-
-This stays close to the app because save behavior is tightly tied to dialogs, dirty tracking, close confirmation, and user-visible status updates.
-
-## Persistence
-
-The app stores two kinds of user data outside the project tree:
-
-- `config.toml` in the platform config directory
-- `recent-files.txt` in the platform data directory
-
-That code now lives under `src/persistence/`:
-
-- `config.rs` handles config parsing and atomic config writes
-- `recent_files.rs` handles recent-file loading, normalization, and atomic writes
-- `paths.rs` resolves platform-specific config and data directories
-
-`AppConfig` currently stores:
-
-- theme preference
-- editor font family
-- editor font size
-
-Recent files are normalized and deduplicated by resolved path. Config and recent files both use atomic writes.
-
-These modules are intentionally thin. They support the Floem app rather than define a separate architecture story of their own.
-
-## Why This Structure
-
-This structure is meant to keep the repo readable as a real Floem application.
-
-The main value of the code base is not that it cleanly separates every concern from the toolkit. The main value is that someone can read it and see:
-
-- how to structure a small Floem app
-- how to manage app-owned menus, overlays, tabs, and editor state
-- how to wire app-wide key handling
-- how to combine persistence with reactive UI state
-- where Floem currently creates extra work for app code
-
-If the app grows, new features should continue to strengthen that role. Good additions are features that both improve the editor and teach a meaningful Floem pattern.
+The window close hook uses `window.on_window_should_close`. If any documents are
+dirty, the app activates the first dirty document, opens a confirmation dialog,
+and returns `false` to cancel the platform close request. Confirming the dialog
+calls `window.remove_window()`.
