@@ -1,6 +1,6 @@
 use gpui::{
-    AnyElement, Context, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    Styled as _, Window, div, px, relative, FontWeight,
+    AnyElement, Context, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
+    Render, Styled as _, Window, div, px, relative,
 };
 use gpui_component::{
     ActiveTheme as _, IconName, Root, Sizable as _,

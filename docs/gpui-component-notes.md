@@ -60,8 +60,20 @@ focuses that document's `InputState` with its GPUI focus handle.
 code-editor behavior is not a separate widget in the GPUI app; it is a mode on
 `InputState`.
 
-`InputState::code_editor("markdown")` enables the code-editor path. In that
-mode, Markdown headings were colored blue because:
+The GPUI app uses Markdown code-editor mode:
+
+```rust
+InputState::new(window, cx)
+    .code_editor("markdown")
+    .searchable(true)
+    .default_value(text)
+```
+
+The `gpui-component` dependency must enable `tree-sitter-languages`; without
+that feature, `code_editor("markdown")` has no registered Markdown parser and
+does not produce Markdown highlights.
+
+Markdown headings are colored because:
 
 - `/my/src/gpui-component/crates/ui/src/highlighter/languages/markdown/highlights.scm`
   captures Markdown headings as `@title`.
@@ -71,32 +83,37 @@ mode, Markdown headings were colored blue because:
 That means the blue heading color is not a one-off Markdown rule in the editor
 view. It comes from the normal highlight query plus theme mapping.
 
+Markdown inline content is parsed through the Markdown injection query:
+
+- `/my/src/gpui-component/crates/ui/src/highlighter/languages/markdown/injections.scm`
+  maps `(inline)` content to `markdown_inline`.
+- `/my/src/gpui-component/crates/ui/src/highlighter/languages/markdown_inline/highlights.scm`
+  captures strong emphasis as `@emphasis.strong`.
+
+The app fills missing highlight styles from the matching default GPUI Component
+theme, then adds `font_weight = 700` for
+`highlight.syntax.emphasis.strong` before applying a theme when the theme does
+not already define a weight for that capture. This makes Markdown
+strong-emphasis spans render bold while still letting custom themes provide
+their own weight. While testing the Markdown inline highlight path, the app also
+fills in a dark blue fallback color for that capture.
+
 `InputState::code_editor("text")` removes visible Markdown colors, but it still
 uses the code-editor path. It is not the same as bypassing the syntax system.
 
-The current GPUI app uses plain multiline input instead:
-
-```rust
-InputState::new(window, cx)
-    .multi_line(true)
-    .searchable(true)
-    .default_value(text)
-```
-
-From source inspection, this plain multiline mode bypasses the Tree-sitter
-highlight path:
+Plain multiline input bypasses the Tree-sitter highlight path:
 
 - `set_value` only queues highlight updates when the mode is code editor.
 - `highlight_lines` returns no highlight data unless the mode is code editor.
 - `update_highlighter` only creates a `SyntaxHighlighter` in the code-editor
   mode branch.
 
-This mode also removes code-editor-specific UI such as line numbers and the
-code-editor context menu entries. Normal text editing behavior still works.
+Plain multiline mode also removes code-editor-specific UI such as line numbers
+and code-editor context menu entries. Normal text editing behavior still works.
 
 ## Context Menus
 
-Plain multiline input includes a normal default context menu.
+Markdown code-editor input includes code-editor context menu entries.
 
 The default input context menu can be replaced through
 `Input::context_menu(...)`. Source inspection showed the callback receives an
@@ -133,11 +150,11 @@ has a `Custom Theme` entry that reads `theme.json` from the platform config
 directory, parses it as a GPUI Component `ThemeSet`, and applies the first
 theme in that file.
 
-One limitation showed up here: plain light-mode `Input` derives its background
-from `cx.theme().background`, so a custom theme that changes only
-`background` changes the whole app background too. GPUI Component has an
-`editor.background` highlight setting, but the plain multiline input path does
-not use that value unless the input is in code-editor mode.
+One earlier limitation showed up in plain input mode: light-mode `Input`
+derived its background from `cx.theme().background`, so a custom theme that
+changed only `background` changed the whole app background too. Markdown
+code-editor mode can use GPUI Component's `editor.background` highlight
+setting.
 
 The selected GPUI theme is persisted as `gpui_theme` in `config.toml`. Menu
 checkmarks are based on the persisted GPUI choice, so the menu model is

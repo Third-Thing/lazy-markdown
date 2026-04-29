@@ -54,10 +54,18 @@ Each `Document` owns:
 - a pristine text snapshot
 - a dirty flag
 
-The editor surface uses plain multiline `InputState`, not code-editor mode.
-That keeps the app focused on source text editing without syntax coloring,
-line numbers, or language-aware editor commands until those features are
-intentional.
+The editor surface uses GPUI Component's Markdown code-editor mode:
+`InputState::code_editor("markdown")`. This keeps editing source text as the
+main workflow while enabling Tree-sitter highlighting for Markdown structure.
+The `gpui-component` dependency enables its `tree-sitter-languages` feature so
+the Markdown and Markdown inline parsers are registered.
+The app applies a small local theme adjustment before activating GPUI themes.
+Missing highlight styles are filled from the matching default GPUI Component
+theme, and if the active theme does not define
+`highlight.syntax.emphasis.strong`, the app adds `font_weight = 700` so
+Markdown strong-emphasis spans render bold. While testing the Markdown inline
+highlight path, the app also fills in a dark blue fallback color for that
+capture.
 
 ## Startup
 

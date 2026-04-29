@@ -2,9 +2,10 @@ use std::{fs, path::PathBuf, rc::Rc};
 
 use gpui::{Context, Entity, SharedString, Subscription, Window};
 use gpui_component::{
-    Theme, ThemeRegistry, ThemeSet, WindowExt, button::ButtonVariant, dialog::DialogButtonProps,
-    menu::AppMenuBar,
+    Theme, ThemeConfig, ThemeRegistry, ThemeSet, WindowExt, button::ButtonVariant,
+    dialog::DialogButtonProps, menu::AppMenuBar,
 };
+use serde_json::{Map, Value};
 
 use crate::{
     ClearRecentFiles, New, Open, OpenRecent, ResetFontSize, Save, SaveAs, SelectEditorFont,
@@ -321,13 +322,13 @@ fn apply_theme_preference(
     match theme_preference {
         GpuiThemePreference::DefaultLight => {
             let theme_config = ThemeRegistry::global(cx).default_light_theme().clone();
-            Theme::global_mut(cx).apply_config(&theme_config);
+            apply_editor_theme_config(&theme_config, &theme_config, cx)?;
             window.refresh();
             Ok("Theme set to Default Light".to_string())
         }
         GpuiThemePreference::DefaultDark => {
             let theme_config = ThemeRegistry::global(cx).default_dark_theme().clone();
-            Theme::global_mut(cx).apply_config(&theme_config);
+            apply_editor_theme_config(&theme_config, &theme_config, cx)?;
             window.refresh();
             Ok("Theme set to Default Dark".to_string())
         }
@@ -345,7 +346,206 @@ fn apply_custom_theme(window: &mut Window, cx: &mut Context<AppWindow>) -> Resul
         return Err(format!("No themes found in {}", path.display()));
     };
 
-    Theme::global_mut(cx).apply_config(&Rc::new(theme_config.clone()));
+    let default_theme_config = if theme_config.mode.is_dark() {
+        ThemeRegistry::global(cx).default_dark_theme().clone()
+    } else {
+        ThemeRegistry::global(cx).default_light_theme().clone()
+    };
+    apply_editor_theme_config(theme_config, &default_theme_config, cx)?;
     window.refresh();
     Ok(format!("Custom theme loaded: {}", theme_config.name))
+}
+
+fn apply_editor_theme_config(
+    theme_config: &ThemeConfig,
+    default_theme_config: &ThemeConfig,
+    cx: &mut Context<AppWindow>,
+) -> Result<(), String> {
+    let theme_config = theme_config_with_markdown_highlights(theme_config, default_theme_config)?;
+    Theme::global_mut(cx).apply_config(&theme_config);
+    Ok(())
+}
+
+fn theme_config_with_markdown_highlights(
+    theme_config: &ThemeConfig,
+    default_theme_config: &ThemeConfig,
+) -> Result<Rc<ThemeConfig>, String> {
+    let mut value = serde_json::to_value(theme_config)
+        .map_err(|err| format!("Failed to prepare editor theme: {err}"))?;
+    let default_value = serde_json::to_value(default_theme_config)
+        .map_err(|err| format!("Failed to prepare editor theme: {err}"))?;
+    let Some(theme) = value.as_object_mut() else {
+        return Err("Failed to prepare editor theme: expected theme object".to_string());
+    };
+
+    let highlight = object_field(theme, "highlight");
+    if let Some(default_highlight) = default_value.get("highlight") {
+        merge_missing_fields(highlight, default_highlight);
+    }
+
+    let syntax = object_field(highlight, "syntax");
+    let strong = object_field(syntax, "emphasis.strong");
+    strong
+        .entry("font_weight".to_string())
+        .or_insert_with(|| Value::from(700));
+    strong
+        .entry("color".to_string())
+        .or_insert_with(|| Value::from("#00008b"));
+
+    serde_json::from_value::<ThemeConfig>(value)
+        .map(Rc::new)
+        .map_err(|err| format!("Failed to prepare editor theme: {err}"))
+}
+
+fn object_field<'a>(object: &'a mut Map<String, Value>, key: &str) -> &'a mut Map<String, Value> {
+    let value = object
+        .entry(key.to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    if !value.is_object() {
+        *value = Value::Object(Map::new());
+    }
+    value
+        .as_object_mut()
+        .expect("object field was just created")
+}
+
+fn merge_missing_fields(object: &mut Map<String, Value>, defaults: &Value) {
+    let Some(defaults) = defaults.as_object() else {
+        return;
+    };
+
+    for (key, default_value) in defaults {
+        match (object.get_mut(key), default_value.as_object()) {
+            (Some(Value::Object(value)), Some(_)) => merge_missing_fields(value, default_value),
+            (Some(value @ Value::Null), _) => {
+                if !default_value.is_null() {
+                    *value = default_value.clone();
+                }
+            }
+            (Some(_), _) => {}
+            (None, _) => {
+                object.insert(key.clone(), default_value.clone());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui_component::{ThemeConfig, ThemeMode, highlighter::LanguageRegistry};
+    use serde_json::json;
+
+    use super::theme_config_with_markdown_highlights;
+
+    #[test]
+    fn markdown_language_is_registered_for_code_editor() {
+        let registry = LanguageRegistry::singleton();
+
+        assert!(registry.language("markdown").is_some());
+        assert!(registry.language("markdown_inline").is_some());
+    }
+
+    #[test]
+    fn markdown_strong_theme_style_adds_bold_weight() {
+        let theme_config = ThemeConfig {
+            name: "Test".into(),
+            mode: ThemeMode::Light,
+            ..ThemeConfig::default()
+        };
+
+        let theme_config =
+            theme_config_with_markdown_highlights(&theme_config, &theme_config).unwrap();
+        let theme_config = serde_json::to_value(&*theme_config).unwrap();
+
+        assert_eq!(
+            theme_config["highlight"]["syntax"]["emphasis.strong"]["font_weight"],
+            json!(700)
+        );
+        assert_eq!(
+            theme_config["highlight"]["syntax"]["emphasis.strong"]["color"],
+            json!("#00008bff")
+        );
+    }
+
+    #[test]
+    fn markdown_strong_theme_style_keeps_existing_style() {
+        let theme_config = serde_json::from_value::<ThemeConfig>(json!({
+            "name": "Test",
+            "mode": "light",
+            "colors": {},
+            "highlight": {
+                "syntax": {
+                    "emphasis.strong": {
+                        "color": "#111111",
+                        "font_weight": 600
+                    }
+                }
+            }
+        }))
+        .unwrap();
+
+        let theme_config =
+            theme_config_with_markdown_highlights(&theme_config, &theme_config).unwrap();
+        let theme_config = serde_json::to_value(&*theme_config).unwrap();
+
+        assert_eq!(
+            theme_config["highlight"]["syntax"]["emphasis.strong"]["font_weight"],
+            json!(600)
+        );
+        assert_eq!(
+            theme_config["highlight"]["syntax"]["emphasis.strong"]["color"],
+            json!("#111111ff")
+        );
+    }
+
+    #[test]
+    fn markdown_highlights_inherit_missing_default_styles() {
+        let theme_config = serde_json::from_value::<ThemeConfig>(json!({
+            "name": "Custom",
+            "mode": "light",
+            "colors": {},
+            "highlight": {
+                "syntax": {
+                    "title": {
+                        "color": "#111111"
+                    }
+                }
+            }
+        }))
+        .unwrap();
+        let default_theme_config = serde_json::from_value::<ThemeConfig>(json!({
+            "name": "Default",
+            "mode": "light",
+            "colors": {},
+            "highlight": {
+                "editor.background": "#ffffff",
+                "syntax": {
+                    "title": {
+                        "color": "#222222"
+                    },
+                    "link_uri": {
+                        "color": "#333333"
+                    }
+                }
+            }
+        }))
+        .unwrap();
+
+        let theme_config =
+            theme_config_with_markdown_highlights(&theme_config, &default_theme_config).unwrap();
+        let theme_config = serde_json::to_value(&*theme_config).unwrap();
+
+        assert_eq!(
+            theme_config["highlight"]["syntax"]["title"]["color"],
+            json!("#111111ff")
+        );
+        assert_eq!(
+            theme_config["highlight"]["syntax"]["link_uri"]["color"],
+            json!("#333333ff")
+        );
+        assert_eq!(
+            theme_config["highlight"]["editor.background"],
+            json!("#ffffffff")
+        );
+    }
 }
