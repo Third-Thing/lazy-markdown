@@ -1,29 +1,10 @@
 # lazy-markdown
 
-Goal: An efficient, safe, modular plain text editor with markdown-aware structure tools, with all dependencies written in Rust.
+Goal: An efficient, safe, modular plain text editor with markdown-aware structure tools, with all dependencies written in Rust (tree-sitter is an exception at the moment, while experimenting with gpui-component).
 
-The basic principle for this project is that minor usability conveniences don't outweigh gross programmatic inefficiencies. For example, almost nothing will be triggered on every keystroke.
+The basic principle for this project is that minor usability conveniences don't outweigh gross programmatic inefficiencies. That means things like split/live preview probably won't be featured.
 
-## Scope
-
-`lazy-markdown` is a plain text editor first.
-
-The project aims to help people edit markdown source more effectively through structure-aware tools, not by maintaining a second rendered view of the document.
-
-That means the project is interested in features such as:
-
-- outline navigation
-- heading-aware movement and selection
-- markdown normalization
-- structural transforms
-- source cleanup and conversion helpers
-
-It is not interested in features such as:
-
-- split view
-- live preview
-- built-in rendered markdown views
-- always-on background work that duplicates what the source text already says
+The project aims to help people edit markdown source more effectively through structure-aware tools.
 
 ## Status
 
@@ -44,14 +25,33 @@ This program is only tested on Linux/Wayland.
 - atomic writing
 - dark/light theme options
 
-## Planned features
+#### Custom theme
 
-### v0.5.0
+A sample `theme.json` is in the pkg directory.
+Add it to ~/.config/lazy-markdown/ and select Custom in the theme menu. The file name must be `theme.json`.
 
+#### Switch to basic editor
+
+The code-editor allows for editor theme settings and markdown syntax highlighting. If you don't care about that you can switch to the basic editor.
+
+Set this in `~/.config/lazy-markdown/config.toml`:
+
+`editor_mode = "basic"`
+
+or
+
+`editor_mode = "code_editor"`
+
+
+## Possible future enhancements
+
+The current direction and work-in-progress is broadcasted in [issues](https://github.com/Third-Thing/lazy-markdown/issues) / [milestones](https://github.com/Third-Thing/lazy-markdown/milestones).
+
+- hardwrapped line converter
+- block quote hotkey
+- improved markdown syntax highlighting
+- static markdown preview window 
 - folder view
-
-### Beyond
-
 - outline navigation
 - heading-aware document navigation
 - search / replace
@@ -62,6 +62,20 @@ This program is only tested on Linux/Wayland.
 - convert pasted content to markdown
 - optional markdown parsing for structure-aware commands
 - LSP / service API for iwe, quickmark, etc
+
+## Installation
+
+You can use `install.sh` to install locally (without su).
+
+For a system level RPM install on openSUSE:
+
+```sh
+cargo install cargo-generate-rpm
+cargo build --release
+strip -s target/release/lazy-markdown
+cargo generate-rpm
+zypper install ./target/generate-rpm/<file>.rpm
+```
 
 ## License
 
