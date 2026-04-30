@@ -388,9 +388,6 @@ fn theme_config_with_markdown_highlights(
     strong
         .entry("font_weight".to_string())
         .or_insert_with(|| Value::from(700));
-    strong
-        .entry("color".to_string())
-        .or_insert_with(|| Value::from("#00008b"));
 
     serde_json::from_value::<ThemeConfig>(value)
         .map(Rc::new)
@@ -461,10 +458,7 @@ mod tests {
             theme_config["highlight"]["syntax"]["emphasis.strong"]["font_weight"],
             json!(700)
         );
-        assert_eq!(
-            theme_config["highlight"]["syntax"]["emphasis.strong"]["color"],
-            json!("#00008bff")
-        );
+        assert!(theme_config["highlight"]["syntax"]["emphasis.strong"]["color"].is_null());
     }
 
     #[test]

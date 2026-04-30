@@ -63,9 +63,7 @@ The app applies a small local theme adjustment before activating GPUI themes.
 Missing highlight styles are filled from the matching default GPUI Component
 theme, and if the active theme does not define
 `highlight.syntax.emphasis.strong`, the app adds `font_weight = 700` so
-Markdown strong-emphasis spans render bold. While testing the Markdown inline
-highlight path, the app also fills in a dark blue fallback color for that
-capture.
+Markdown strong-emphasis spans render bold.
 
 ## Startup
 

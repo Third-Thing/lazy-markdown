@@ -95,8 +95,7 @@ theme, then adds `font_weight = 700` for
 `highlight.syntax.emphasis.strong` before applying a theme when the theme does
 not already define a weight for that capture. This makes Markdown
 strong-emphasis spans render bold while still letting custom themes provide
-their own weight. While testing the Markdown inline highlight path, the app also
-fills in a dark blue fallback color for that capture.
+their own weight.
 
 `InputState::code_editor("text")` removes visible Markdown colors, but it still
 uses the code-editor path. It is not the same as bypassing the syntax system.
