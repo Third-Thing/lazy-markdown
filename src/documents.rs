@@ -14,7 +14,7 @@ use gpui_component::{
 };
 
 use crate::{
-    persistence::{store_recent_files, write_file_atomic},
+    persistence::{EditorMode, store_recent_files, write_file_atomic},
     window::AppWindow,
 };
 
@@ -89,12 +89,8 @@ impl AppWindow {
         }
 
         let id = self.allocate_document_id();
-        let editor = cx.new(|cx| {
-            InputState::new(window, cx)
-                .code_editor("markdown")
-                .searchable(true)
-                .default_value(text.clone())
-        });
+        let editor_mode = self.app_config.editor_mode;
+        let editor = cx.new(|cx| create_editor_state(text.clone(), editor_mode, window, cx));
         let subscription = cx.subscribe_in(&editor, window, {
             let editor = editor.clone();
             move |this, _, event: &InputEvent, _, cx| {
@@ -574,4 +570,19 @@ impl AppWindow {
             .find(|document| document.current_path.as_deref() == Some(path))
             .map(|document| document.id)
     }
+}
+
+fn create_editor_state(
+    text: String,
+    editor_mode: EditorMode,
+    window: &mut Window,
+    cx: &mut Context<InputState>,
+) -> InputState {
+    let input = InputState::new(window, cx);
+    let input = match editor_mode {
+        EditorMode::Basic => input.multi_line(true),
+        EditorMode::CodeEditor => input.code_editor("markdown"),
+    };
+
+    input.searchable(true).default_value(text)
 }

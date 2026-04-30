@@ -49,9 +49,39 @@ impl GpuiThemePreference {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum EditorMode {
+    Basic,
+    CodeEditor,
+}
+
+impl Default for EditorMode {
+    fn default() -> Self {
+        Self::CodeEditor
+    }
+}
+
+impl EditorMode {
+    pub(crate) fn config_value(self) -> &'static str {
+        match self {
+            Self::Basic => "basic",
+            Self::CodeEditor => "code_editor",
+        }
+    }
+
+    pub(crate) fn from_config_value(value: &str) -> Option<Self> {
+        match value {
+            "basic" | "plain" | "plain_text" => Some(Self::Basic),
+            "code_editor" | "markdown_code_editor" => Some(Self::CodeEditor),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AppConfig {
     pub(crate) gpui_theme: GpuiThemePreference,
+    pub(crate) editor_mode: EditorMode,
     pub(crate) editor_font: String,
     pub(crate) editor_font_size: usize,
     main_theme_preference: Option<String>,
@@ -61,6 +91,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             gpui_theme: GpuiThemePreference::DefaultLight,
+            editor_mode: EditorMode::default(),
             editor_font: default_editor_font(),
             editor_font_size: default_editor_font_size(),
             main_theme_preference: None,
@@ -95,6 +126,12 @@ impl AppConfig {
                     };
                     config.gpui_theme = theme;
                 }
+                "editor_mode" => {
+                    let Some(editor_mode) = EditorMode::from_config_value(value) else {
+                        return Err(format!("Invalid editor_mode value: {value}"));
+                    };
+                    config.editor_mode = editor_mode;
+                }
                 "editor_font" => {
                     if value.is_empty() {
                         return Err("Invalid editor_font value: empty string".to_string());
@@ -120,8 +157,9 @@ impl AppConfig {
             text.push_str(&format!("theme = \"{theme}\"\n"));
         }
         text.push_str(&format!(
-            "gpui_theme = \"{}\"\neditor_font = \"{}\"\neditor_font_size = {}\n",
+            "gpui_theme = \"{}\"\neditor_mode = \"{}\"\neditor_font = \"{}\"\neditor_font_size = {}\n",
             self.gpui_theme.config_value(),
+            self.editor_mode.config_value(),
             normalize_editor_font(&self.editor_font),
             normalize_editor_font_size(self.editor_font_size)
         ));
@@ -355,13 +393,14 @@ fn save_target_path(path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::{AppConfig, GpuiThemePreference};
+    use super::{AppConfig, EditorMode, GpuiThemePreference};
     use crate::preferences::{MAX_EDITOR_FONT_SIZE, MONOSPACE_FONT, SYSTEM_DEFAULT_FONT};
 
     #[test]
     fn config_round_trip_keeps_editor_font_preferences() {
         let config = AppConfig {
             gpui_theme: GpuiThemePreference::Custom,
+            editor_mode: EditorMode::Basic,
             editor_font: MONOSPACE_FONT.to_string(),
             editor_font_size: 19,
             main_theme_preference: Some("dark".to_string()),
@@ -384,5 +423,14 @@ mod tests {
         let config = AppConfig::from_str("gpui_theme = \"custom\"\n").unwrap();
 
         assert_eq!(config.gpui_theme, GpuiThemePreference::Custom);
+    }
+
+    #[test]
+    fn config_accepts_editor_mode_preferences() {
+        let config = AppConfig::from_str("editor_mode = \"basic\"\n").unwrap();
+        assert_eq!(config.editor_mode, EditorMode::Basic);
+
+        let config = AppConfig::from_str("editor_mode = \"code_editor\"\n").unwrap();
+        assert_eq!(config.editor_mode, EditorMode::CodeEditor);
     }
 }

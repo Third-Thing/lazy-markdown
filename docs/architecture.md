@@ -54,11 +54,14 @@ Each `Document` owns:
 - a pristine text snapshot
 - a dirty flag
 
-The editor surface uses GPUI Component's Markdown code-editor mode:
+The editor surface defaults to GPUI Component's Markdown code-editor mode:
 `InputState::code_editor("markdown")`. This keeps editing source text as the
 main workflow while enabling Tree-sitter highlighting for Markdown structure.
+Users can opt into GPUI Component's basic multiline editor by setting
+`editor_mode = "basic"` in `config.toml`; the default config value is
+`editor_mode = "code_editor"`.
 The `gpui-component` dependency enables its `tree-sitter-languages` feature so
-the Markdown and Markdown inline parsers are registered.
+the Markdown and Markdown inline parsers are registered for code-editor mode.
 The app applies a small local theme adjustment before activating GPUI themes.
 Missing highlight styles are filled from the matching default GPUI Component
 theme, and if the active theme does not define
@@ -125,7 +128,7 @@ menu state follows persisted state.
 
 User data is stored under the app's platform config and data directories.
 
-- `config.toml` stores GPUI theme choice, editor font family, and editor font size.
+- `config.toml` stores GPUI theme choice, editor mode, editor font family, and editor font size.
 - `theme.json` can provide a custom GPUI Component theme.
 - `recent-files.txt` stores the recent file list.
 

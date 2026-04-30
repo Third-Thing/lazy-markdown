@@ -69,6 +69,10 @@ InputState::new(window, cx)
     .default_value(text)
 ```
 
+This is the default editor mode. Setting `editor_mode = "basic"` in
+`config.toml` uses GPUI Component's plain multiline input instead. Setting
+`editor_mode = "code_editor"` uses Markdown code-editor mode.
+
 The `gpui-component` dependency must enable `tree-sitter-languages`; without
 that feature, `code_editor("markdown")` has no registered Markdown parser and
 does not produce Markdown highlights.
