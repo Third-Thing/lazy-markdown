@@ -22,10 +22,15 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", features = [
     "wayland",
     "runtime_shaders",
 ] }
-gpui-component = { git = "https://github.com/Third-Thing/gpui-component", branch = "menu-hover-fix", features = [
-    "tree-sitter-languages",
+gpui-component = { git = "https://github.com/Third-Thing/gpui-component", branch = "markdown-nested-emphasis-marks", features = [
+    "tree-sitter-markdown",
 ] }
-gpui-component-assets = { git = "https://github.com/Third-Thing/gpui-component", branch = "menu-hover-fix" }
+gpui-component-assets = { git = "https://github.com/Third-Thing/gpui-component", branch = "markdown-nested-emphasis-marks" }
+
+# gpui-component = { path = "/my/src/gpui-component/crates/ui", features = [
+#     "tree-sitter-languages",
+# ] }
+# gpui-component-assets = { path = "/my/src/gpui-component/crates/assets" }
 
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 serde = { version = "1", features = ["derive"] }
