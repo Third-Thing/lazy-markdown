@@ -361,12 +361,12 @@ fn apply_editor_theme_config(
     default_theme_config: &ThemeConfig,
     cx: &mut Context<AppWindow>,
 ) -> Result<(), String> {
-    let theme_config = theme_config_with_markdown_highlights(theme_config, default_theme_config)?;
+    let theme_config = theme_config_with_default_highlights(theme_config, default_theme_config)?;
     Theme::global_mut(cx).apply_config(&theme_config);
     Ok(())
 }
 
-fn theme_config_with_markdown_highlights(
+fn theme_config_with_default_highlights(
     theme_config: &ThemeConfig,
     default_theme_config: &ThemeConfig,
 ) -> Result<Rc<ThemeConfig>, String> {
@@ -382,12 +382,6 @@ fn theme_config_with_markdown_highlights(
     if let Some(default_highlight) = default_value.get("highlight") {
         merge_missing_fields(highlight, default_highlight);
     }
-
-    let syntax = object_field(highlight, "syntax");
-    let strong = object_field(syntax, "emphasis.strong");
-    strong
-        .entry("font_weight".to_string())
-        .or_insert_with(|| Value::from(700));
 
     serde_json::from_value::<ThemeConfig>(value)
         .map(Rc::new)
@@ -432,7 +426,7 @@ mod tests {
     use gpui_component::{ThemeConfig, ThemeMode, highlighter::LanguageRegistry};
     use serde_json::json;
 
-    use super::theme_config_with_markdown_highlights;
+    use super::theme_config_with_default_highlights;
 
     #[test]
     fn markdown_language_is_registered_for_code_editor() {
@@ -443,15 +437,28 @@ mod tests {
     }
 
     #[test]
-    fn markdown_strong_theme_style_adds_bold_weight() {
+    fn markdown_strong_theme_style_inherits_default_weight() {
         let theme_config = ThemeConfig {
             name: "Test".into(),
             mode: ThemeMode::Light,
             ..ThemeConfig::default()
         };
+        let default_theme_config = serde_json::from_value::<ThemeConfig>(json!({
+            "name": "Default",
+            "mode": "light",
+            "colors": {},
+            "highlight": {
+                "syntax": {
+                    "emphasis.strong": {
+                        "font_weight": 700
+                    }
+                }
+            }
+        }))
+        .unwrap();
 
         let theme_config =
-            theme_config_with_markdown_highlights(&theme_config, &theme_config).unwrap();
+            theme_config_with_default_highlights(&theme_config, &default_theme_config).unwrap();
         let theme_config = serde_json::to_value(&*theme_config).unwrap();
 
         assert_eq!(
@@ -479,7 +486,7 @@ mod tests {
         .unwrap();
 
         let theme_config =
-            theme_config_with_markdown_highlights(&theme_config, &theme_config).unwrap();
+            theme_config_with_default_highlights(&theme_config, &theme_config).unwrap();
         let theme_config = serde_json::to_value(&*theme_config).unwrap();
 
         assert_eq!(
@@ -526,7 +533,7 @@ mod tests {
         .unwrap();
 
         let theme_config =
-            theme_config_with_markdown_highlights(&theme_config, &default_theme_config).unwrap();
+            theme_config_with_default_highlights(&theme_config, &default_theme_config).unwrap();
         let theme_config = serde_json::to_value(&*theme_config).unwrap();
 
         assert_eq!(

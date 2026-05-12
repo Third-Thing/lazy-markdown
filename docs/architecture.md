@@ -60,13 +60,12 @@ main workflow while enabling Tree-sitter highlighting for Markdown structure.
 Users can opt into GPUI Component's basic multiline editor by setting
 `editor_mode = "basic"` in `config.toml`; the default config value is
 `editor_mode = "code_editor"`.
-The `gpui-component` dependency enables its `tree-sitter-languages` feature so
+The `gpui-component` dependency enables its `tree-sitter-markdown` feature so
 the Markdown and Markdown inline parsers are registered for code-editor mode.
 The app applies a small local theme adjustment before activating GPUI themes.
-Missing highlight styles are filled from the matching default GPUI Component
-theme, and if the active theme does not define
-`highlight.syntax.emphasis.strong`, the app adds `font_weight = 700` so
-Markdown strong-emphasis spans render bold.
+Missing highlight styles in custom themes are filled from the matching default
+GPUI Component theme so partial custom highlight blocks keep Markdown styles
+such as headings, links, italic emphasis, and strong emphasis.
 
 ## Startup
 

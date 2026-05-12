@@ -73,7 +73,7 @@ This is the default editor mode. Setting `editor_mode = "basic"` in
 `config.toml` uses GPUI Component's plain multiline input instead. Setting
 `editor_mode = "code_editor"` uses Markdown code-editor mode.
 
-The `gpui-component` dependency must enable `tree-sitter-languages`; without
+The `gpui-component` dependency must enable `tree-sitter-markdown`; without
 that feature, `code_editor("markdown")` has no registered Markdown parser and
 does not produce Markdown highlights.
 
@@ -95,11 +95,9 @@ Markdown inline content is parsed through the Markdown injection query:
   captures strong emphasis as `@emphasis.strong`.
 
 The app fills missing highlight styles from the matching default GPUI Component
-theme, then adds `font_weight = 700` for
-`highlight.syntax.emphasis.strong` before applying a theme when the theme does
-not already define a weight for that capture. This makes Markdown
-strong-emphasis spans render bold while still letting custom themes provide
-their own weight.
+theme before applying custom themes. This lets partial custom highlight blocks
+keep Markdown styles from the default theme, including italic emphasis and
+bold strong emphasis, while still letting custom themes override those styles.
 
 `InputState::code_editor("text")` removes visible Markdown colors, but it still
 uses the code-editor path. It is not the same as bypassing the syntax system.
