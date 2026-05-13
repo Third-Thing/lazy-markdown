@@ -17,8 +17,9 @@ use crate::{
         load_recent_files, store_app_config,
     },
     preferences::{
-        decrease_editor_font_size, default_editor_font_size, editor_font_label,
-        increase_editor_font_size, normalize_editor_font, normalize_editor_font_size,
+        EditorFontFamilies, decrease_editor_font_size, default_editor_font_size,
+        editor_font_label, increase_editor_font_size, normalize_editor_font,
+        normalize_editor_font_size,
     },
 };
 
@@ -29,7 +30,7 @@ pub(crate) struct AppWindow {
     pub(crate) app_menu_bar: Entity<AppMenuBar>,
     pub(crate) recent_files: RecentFiles,
     pub(crate) app_config: AppConfig,
-    pub(crate) available_font_families: Vec<String>,
+    pub(crate) editor_font_families: EditorFontFamilies,
     pub(crate) status: SharedString,
     pub(crate) _subscriptions: Vec<Subscription>,
 }
@@ -58,7 +59,7 @@ impl AppWindow {
         );
         let app_menu_bar = AppMenuBar::new(cx);
         app_menu_bar.update(cx, |menu_bar, cx| menu_bar.reload(cx));
-        let available_font_families = cx.text_system().all_font_names();
+        let editor_font_families = EditorFontFamilies::from_fontconfig();
 
         let mut this = Self {
             documents: Vec::new(),
@@ -67,7 +68,7 @@ impl AppWindow {
             app_menu_bar,
             recent_files,
             app_config,
-            available_font_families,
+            editor_font_families,
             status: "Ready".into(),
             _subscriptions: Vec::new(),
         };

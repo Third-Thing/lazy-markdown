@@ -39,11 +39,8 @@ impl Render for AppWindow {
         });
         let active_editor = self.active_editor();
         let selected_index = self.active_index().unwrap_or(0);
-        let editor_font_family = editor_font_family(
-            &self.app_config.editor_font,
-            &self.available_font_families,
-            cx,
-        );
+        let editor_font_family =
+            editor_font_family(&self.app_config.editor_font, &self.editor_font_families, cx);
         let editor_font_size = px(self.app_config.editor_font_size as f32);
 
         v_flex()

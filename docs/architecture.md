@@ -43,8 +43,8 @@ The visible app surface has:
 5. the GPUI Component dialog layer
 
 `AppWindow` is the central state object. It stores the document list, active
-document ID, recent files, app config, available font families, status text,
-menu bar entity, and GPUI subscriptions.
+document ID, recent files, app config, fontconfig-resolved editor font
+families, status text, menu bar entity, and GPUI subscriptions.
 
 Each `Document` owns:
 
@@ -133,9 +133,11 @@ User data is stored under the app's platform config and data directories.
 
 Writes use `atomic-write-file` for documents, config, and recent files.
 
-The font menu stores generic choices such as System Default, Serif, Monospace,
-Cursive, and Fantasy. At render time, generic families are resolved to the
-current GPUI theme font, mono font, or installed concrete font names.
+The font menu stores generic choices for System, Sans Serif, Serif, and
+Monospace. At startup, those choices are resolved through fontconfig generic
+families: `system-ui`, `sans-serif`, `serif`, and `monospace`. If fontconfig
+cannot resolve a family, rendering falls back to the current GPUI theme font or
+mono font.
 
 The editor render style sets an explicit normal font weight and a relative line
 height. GPUI Component's `Input` default line height is rem-based, so using a
