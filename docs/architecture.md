@@ -115,6 +115,7 @@ The app installs these key bindings:
 - `Ctrl+O` for Open
 - `Ctrl+S` for Save
 - `Ctrl+Shift+S` for Save As
+- `Ctrl+F` for the GPUI Component editor search panel when the editor is focused
 - `Ctrl+=`, `Ctrl++`, `Ctrl+Shift+=`, and `Ctrl+Add` for zoom in
 - `Ctrl+-` and `Ctrl+Subtract` for zoom out
 - `Ctrl+0` for reset font size
@@ -122,6 +123,12 @@ The app installs these key bindings:
 The menu bar uses GPUI's app menu model plus `gpui_component::menu::AppMenuBar`.
 The app rebuilds menus after recent-file, theme, and font changes so visible
 menu state follows persisted state.
+
+The Edit menu exposes GPUI Component's built-in editor search panel. The panel
+owns its own query input, match highlighting, next/previous controls, and
+replace controls. `lazy-markdown` currently does not define separate app-level
+Find Next or Find Previous actions because GPUI Component keeps the search
+panel navigation methods private to the component.
 
 ## Preferences And Persistence
 

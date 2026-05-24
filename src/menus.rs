@@ -1,5 +1,5 @@
 use gpui::{App, KeyBinding, Menu, MenuItem};
-use gpui_component::GlobalState;
+use gpui_component::{GlobalState, input::Search};
 
 use crate::{
     ClearRecentFiles, New, Open, OpenRecent, ResetFontSize, Save, SaveAs, SelectEditorFont,
@@ -64,6 +64,11 @@ fn build_app_menus(
                 MenuItem::action("Save", Save),
                 MenuItem::action("Save As...", SaveAs),
             ],
+            disabled: false,
+        },
+        Menu {
+            name: "Edit".into(),
+            items: vec![MenuItem::action("Find...", Search)],
             disabled: false,
         },
         Menu {
