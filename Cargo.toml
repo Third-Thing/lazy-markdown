@@ -16,16 +16,16 @@ assets = [
 
 [dependencies]
 atomic-write-file = { version = "0.3.0", features = ["unnamed-tmpfile"] }
-gpui = { git = "https://github.com/zed-industries/zed" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", features = [
+gpui = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe", features = [
     "font-kit",
     "wayland",
     "runtime_shaders",
 ] }
-gpui-component = { git = "https://github.com/Third-Thing/gpui-component", branch = "markdown-nested-emphasis-marks", features = [
+gpui-component = { git = "https://github.com/longbridge/gpui-component", features = [
     "tree-sitter-markdown",
 ] }
-gpui-component-assets = { git = "https://github.com/Third-Thing/gpui-component", branch = "markdown-nested-emphasis-marks" }
+gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
 
 # gpui-component = { path = "/my/src/gpui-component/crates/ui", features = [
 #     "tree-sitter-languages",

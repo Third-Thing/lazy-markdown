@@ -62,6 +62,10 @@ Users can opt into GPUI Component's basic multiline editor by setting
 `editor_mode = "code_editor"`.
 The `gpui-component` dependency enables its `tree-sitter-markdown` feature so
 the Markdown and Markdown inline parsers are registered for code-editor mode.
+The app pins its direct `gpui` and `gpui_platform` dependencies to the same Zed
+commit used by `gpui-component`. GPUI types from different Zed commits are not
+interchangeable, so upgrading GPUI Component requires checking its workspace
+dependency pins and moving the app's direct GPUI dependencies with them.
 The app applies a small local theme adjustment before activating GPUI themes.
 Missing highlight styles in custom themes are filled from the matching default
 GPUI Component theme so partial custom highlight blocks keep Markdown styles
