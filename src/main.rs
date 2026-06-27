@@ -6,6 +6,7 @@ use gpui_component_assets::Assets;
 use serde::Deserialize;
 
 mod documents;
+mod editing;
 mod menus;
 mod persistence;
 mod preferences;
@@ -16,7 +17,17 @@ use window::AppWindow;
 
 actions!(
     lazy_markdown,
-    [New, Open, Save, SaveAs, ZoomIn, ZoomOut, ResetFontSize]
+    [
+        New,
+        Open,
+        Save,
+        SaveAs,
+        ZoomIn,
+        ZoomOut,
+        ResetFontSize,
+        AddBlockQuote,
+        RemoveBlockQuote
+    ]
 );
 
 #[derive(Action, Clone, PartialEq, Eq, Deserialize)]

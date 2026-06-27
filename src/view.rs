@@ -59,6 +59,8 @@ impl Render for AppWindow {
             .on_action(cx.listener(Self::on_zoom_in))
             .on_action(cx.listener(Self::on_zoom_out))
             .on_action(cx.listener(Self::on_reset_font_size))
+            .on_action(cx.listener(Self::on_add_block_quote))
+            .on_action(cx.listener(Self::on_remove_block_quote))
             .child(
                 div()
                     .w_full()

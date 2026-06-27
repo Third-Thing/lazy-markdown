@@ -2,8 +2,8 @@ use gpui::{App, KeyBinding, Menu, MenuItem};
 use gpui_component::{GlobalState, input::Search};
 
 use crate::{
-    ClearRecentFiles, New, Open, OpenRecent, ResetFontSize, Save, SaveAs, SelectEditorFont,
-    SelectTheme, ZoomIn, ZoomOut,
+    AddBlockQuote, ClearRecentFiles, New, Open, OpenRecent, RemoveBlockQuote, ResetFontSize, Save,
+    SaveAs, SelectEditorFont, SelectTheme, ZoomIn, ZoomOut,
     persistence::{GpuiThemePreference, RecentFiles},
     preferences::{available_editor_fonts, editor_font_label},
 };
@@ -29,6 +29,11 @@ pub(crate) fn install_app_menus(
         KeyBinding::new("ctrl--", ZoomOut, None),
         KeyBinding::new("ctrl-subtract", ZoomOut, None),
         KeyBinding::new("ctrl-0", ResetFontSize, None),
+        // On Wayland/X11 a shifted symbol arrives as the shifted character with
+        // the shift modifier dropped, so bind `ctrl->` / `ctrl-<` rather than
+        // `ctrl-shift-.` / `ctrl-shift-,` (same reason zoom uses `ctrl-+`).
+        KeyBinding::new("ctrl->", AddBlockQuote, None),
+        KeyBinding::new("ctrl-<", RemoveBlockQuote, None),
     ]);
 
     set_app_menus(cx, recent_files, editor_font, theme_preference);
@@ -68,7 +73,12 @@ fn build_app_menus(
         },
         Menu {
             name: "Edit".into(),
-            items: vec![MenuItem::action("Find...", Search)],
+            items: vec![
+                MenuItem::action("Find...", Search),
+                MenuItem::separator(),
+                MenuItem::action("Increase Quote Level", AddBlockQuote),
+                MenuItem::action("Decrease Quote Level", RemoveBlockQuote),
+            ],
             disabled: false,
         },
         Menu {
